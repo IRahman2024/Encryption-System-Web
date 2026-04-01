@@ -1,0 +1,39 @@
+# ==========================================
+# GENERAL / OS
+# ==========================================
+.DS_Store
+*.pem
+*.swp
+.idea/
+.vscode/
+
+# ==========================================
+# FRONTEND (Next.js)
+# ==========================================
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.vercel
+frontend/.env*
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/.pnpm-debug.log*
+frontend/*.tsbuildinfo
+frontend/next-env.d.ts
+
+
+# ==========================================
+# BACKEND (Python/FastAPI)
+# ==========================================
+backend/__pycache__/
+backend/*.py[cod]
+backend/*$py.class
+backend/.env
+backend/.venv/
+backend/venv/
+backend/env/
+backend/build/
+backend/dist/
+backend/*.spec
