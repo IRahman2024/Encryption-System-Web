@@ -75,8 +75,11 @@ export default function Home() {
         </div>
         <div className='flex flex-wrap rounded-full my-5'>
           <MethodSelector
-            selected={method} onChange={handleMethodChange}
-          ></MethodSelector>
+            selected={method}
+            onChange={handleMethodChange}
+            keyValue={key}
+            onKeyChange={setKey}
+          />
         </div>
         <motion.div
           variants={itemVariants}

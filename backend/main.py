@@ -29,6 +29,12 @@ class Playfair_request(BaseModel):  # only for request
     text: str
     key: str
     mode: str
+class Hillfair_request(BaseModel):  # only for request
+    text: str
+    key: List[List[int]]
+    mode: str
+class Hillfair_response(BaseModel):  # only for request
+    message: str
 
 
 class Playfair_Response(BaseModel):  # only for response
@@ -38,6 +44,7 @@ class Playfair_Response(BaseModel):  # only for response
 # test_PlainText = []  # here test cases will be received from frontend
 # test_CipherText: List[ Caesar_Cipher_Response ] = []  # here test cases will be sent to frontend
 
+# Playfair Cipher algo
 class PlayfairCipher:
     def __init__(self, key):
         self.matrix = self._generate_matrix(key)
@@ -87,33 +94,167 @@ class PlayfairCipher:
         return None
 
     def transform(self, text, mode='encrypt'):
-        """Main logic for both encryption and decryption."""
-        shift = 1 if mode == 'encrypt' else -1
+    # 1. Record the original positions of all spaces
+        space_indices = [i for i, char in enumerate(text) if char == ' ']
+        
+        # 2. Define shift (1 for encrypt, 4 for decrypt as -1 % 5 = 4)
+        shift = 1 if mode == 'encrypt' else 4
+        
+        # 3. Clean and pair the text (removes spaces internally)
         prepared_text = self._prepare_text(text, mode)
-        result = []
+        result_list = []
 
+        # 4. Standard Playfair Rules Logic
         for i in range(0, len(prepared_text), 2):
             char1, char2 = prepared_text[i], prepared_text[i+1]
-            r1, c1 = self._find_position(char1)
-            r2, c2 = self._find_position(char2)
+            
+            pos1 = self._find_position(char1)
+            pos2 = self._find_position(char2)
+            
+            # Safety check for characters not in matrix
+            if pos1 is None or pos2 is None:
+                continue
+                
+            r1, c1 = pos1
+            r2, c2 = pos2
 
-            if r1 == r2: # Rule 1: Same Row (Horizontal shift)
-                result.append(self.matrix[r1][(c1 + shift) % 5])
-                result.append(self.matrix[r2][(c2 + shift) % 5])
-            elif c1 == c2: # Rule 2: Same Column (Vertical shift)
-                result.append(self.matrix[(r1 + shift) % 5][c1])
-                result.append(self.matrix[(r2 + shift) % 5][c2])
-            else: # Rule 3: Rectangle (Swap columns)
-                result.append(self.matrix[r1][c2])
-                result.append(self.matrix[r2][c1])
+            if r1 == r2: # Rule: Same Row (Horizontal shift)
+                result_list.append(self.matrix[r1][(c1 + shift) % 5])
+                result_list.append(self.matrix[r1][(c2 + shift) % 5])
+            elif c1 == c2: # Rule: Same Column (Vertical shift)
+                result_list.append(self.matrix[(r1 + shift) % 5][c1])
+                result_list.append(self.matrix[(r2 + shift) % 5][c2])
+            else: # Rule: Rectangle (Swap columns)
+                result_list.append(self.matrix[r1][c2])
+                result_list.append(self.matrix[r2][c1])
 
-        return "".join(result)
+        # 5. Re-insert spaces back into the result string
+        for index in space_indices:
+            # If the index is within the current result, insert it
+            if index < len(result_list):
+                result_list.insert(index, ' ')
+            else:
+                # If the text grew (due to padding), add space to the end
+                result_list.append(' ')
+
+        return "".join(result_list)
 
     def display_matrix(self):
         print("--- 5x5 Key Matrix ---")
         for row in self.matrix:
             print(" ".join(row))
         print("----------------------")
+
+# Hill Cipher Algo
+class HillCipher:
+    def __init__(self, key_matrix):
+        """
+        Initialize with a square matrix (list of lists).
+        Example: [[3, 3], [2, 5]]
+        """
+        self.key_matrix = key_matrix
+        self.n = len(key_matrix)
+        if any(len(row) != self.n for row in key_matrix):
+            raise ValueError("Key matrix must be square.")
+
+    def _char_to_int(self, char):
+        return ord(char.upper()) - ord('A')
+
+    def _int_to_char(self, integer):
+        return chr((int(integer) % 26) + ord('A'))
+
+    def _get_determinant(self, matrix):
+        """Calculates determinant for 2x2 or 3x3 matrices."""
+        if len(matrix) == 2:
+            return matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0]
+        elif len(matrix) == 3:
+            a, b, c = matrix[0]
+            d, e, f = matrix[1]
+            g, h, i = matrix[2]
+            return a*(e*i - f*h) - b*(d*i - f*g) + c*(d*h - e*g)
+        else:
+            raise NotImplementedError("This logic currently supports 2x2 or 3x3.")
+
+    def _mod_inverse(self, a, m):
+        """Finds modular inverse of a number 'a' under modulo 'm'."""
+        for x in range(1, m):
+            if (a * x) % m == 1:
+                return x
+        raise ValueError(f"Modular inverse does not exist for determinant {a}")
+
+    def _get_adjugate_matrix(self, matrix):
+        """Calculates the adjugate matrix for 2x2 or 3x3."""
+        if len(matrix) == 2:
+            return [[matrix[1][1], -matrix[0][1]], 
+                    [-matrix[1][0], matrix[0][0]]]
+        elif len(matrix) == 3:
+            # Minors and cofactors logic
+            adj = [[0]*3 for _ in range(3)]
+            for r in range(3):
+                for c in range(3):
+                    # Minor matrix
+                    minor = [row[:c] + row[c+1:] for row in (matrix[:r] + matrix[r+1:])]
+                    det_minor = minor[0][0] * minor[1][1] - minor[0][1] * minor[1][0]
+                    adj[c][r] = ((-1)**(r+c)) * det_minor # Transpose applied here
+            return adj
+
+    def encrypt(self, text):
+        # 1. Record space positions
+        space_indices = [i for i, char in enumerate(text) if char == ' ']
+        
+        # 2. Clean text for processing (remove spaces)
+        clean_text = "".join(filter(str.isalpha, text.upper()))
+        
+        # 3. Padding
+        while len(clean_text) % self.n != 0:
+            clean_text += 'X'
+
+        # 4. Standard Hill Cipher Logic
+        cipher_list = []
+        for i in range(0, len(clean_text), self.n):
+            block = [self._char_to_int(c) for c in clean_text[i:i+self.n]]
+            for row in self.key_matrix:
+                dot_product = sum(row[j] * block[j] for j in range(self.n))
+                cipher_list.append(self._int_to_char(dot_product % 26))
+        
+        # 5. Re-insert spaces into the result
+        for index in space_indices:
+            if index < len(cipher_list):
+                cipher_list.insert(index, ' ')
+            else:
+                cipher_list.append(' ')
+                
+        return "".join(cipher_list)
+
+    def decrypt(self, cipher_text):
+        # 1. Record space positions
+        space_indices = [i for i, char in enumerate(cipher_text) if char == ' ']
+        
+        # 2. Clean text (remove spaces)
+        clean_cipher = cipher_text.replace(" ", "")
+        
+        # 3. Get Inverted Matrix
+        det = self._get_determinant(self.key_matrix) % 26
+        det_inv = self._mod_inverse(det, 26)
+        adjugate = self._get_adjugate_matrix(self.key_matrix)
+        inv_key = [[(det_inv * cell) % 26 for cell in row] for row in adjugate]
+
+        plain_list = []
+        for i in range(0, len(clean_cipher), self.n):
+            block = [self._char_to_int(c) for c in clean_cipher[i:i+self.n]]
+            for row in inv_key:
+                dot_product = sum(row[j] * block[j] for j in range(self.n))
+                plain_list.append(self._int_to_char(dot_product % 26))
+        
+        # 5. Re-insert spaces
+        for index in space_indices:
+            if index < len(plain_list):
+                plain_list.insert(index, ' ')
+            else:
+                plain_list.append(' ')
+                
+        return "".join(plain_list)
+
 
 
 @app.get("/")
@@ -196,7 +337,7 @@ def playfair_cipher(payload: Playfair_request):
     key = payload.key
     mode = payload.mode
 
-    print(mode)
+    # print(mode)
     
     cipher = PlayfairCipher(key)
     
@@ -216,4 +357,29 @@ def playfair_cipher(payload: Playfair_request):
 
    
 
-# playfair-cipher decryption
+# hillfair-cipher api
+@app.post("/hillfair-cipher", response_model=Hillfair_response)
+def hillfair_cipher(payload: Hillfair_request):
+    plaintext = payload.text
+    key = payload.key
+    mode = payload.mode
+
+    # print(plaintext)
+    # print(key)
+    # print(mode)
+    
+    cipher = HillCipher(key)
+    
+    # cipher.display_matrix()
+    
+    # msg = "INSTRUMENTS"
+    # encrypted =g
+
+    if mode == "encrypt":
+        print('this is encryption request')
+        encrypted = cipher.encrypt(plaintext)
+        return {"message": mode + ": " + encrypted}
+    else:
+        print('this is decryption request')
+        decrypted = cipher.decrypt(plaintext)
+        return {"message": mode + ": " + decrypted}

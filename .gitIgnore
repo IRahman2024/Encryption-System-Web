@@ -37,3 +37,4 @@ backend/env/
 backend/build/
 backend/dist/
 backend/*.spec
+backend/readme.md
