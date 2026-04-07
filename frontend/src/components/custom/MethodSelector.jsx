@@ -1,23 +1,16 @@
 'use client'
 import React, { useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { KeyRound } from 'lucide-react'
+import { KeyRound, RefreshCw } from 'lucide-react'
 
 const METHODS = [
     { id: 'caesar',   label: 'Caesar'   },
-    { id: 'vigenère', label: 'Vigenère' },
+    { id: 'vigenere', label: 'Vigenère' },
     { id: 'playfair', label: 'Playfair' },
     { id: 'hill',     label: 'Hill'     },
     { id: 'rsa',      label: 'RSA'      },
 ]
 
-/* ── Playfair helpers ───────────────────────────────────────── */
-
-/**
- * Build a 25-letter Playfair alphabet from a key string.
- * Returns { grid: string[25], keySet: Set<string> }
- * Rules: uppercase, I=J merged, deduplicate, fill remaining A-Z.
- */
 function buildPlayfairGrid(rawKey) {
     const keyLetters = rawKey
         .toUpperCase()
@@ -149,6 +142,128 @@ function PlayfairGrid({ rawKey }) {
     )
 }
 
+function HillMatrixInput({ value, onChange }) {
+    const matrix = useMemo(() => {
+        try {
+            const parsed = JSON.parse(value);
+            if (Array.isArray(parsed) && Array.isArray(parsed[0])) {
+                return parsed;
+            }
+        } catch {
+            return [[0, 0], [0, 0]];
+        }
+        return [[0, 0], [0, 0]];
+    }, [value]);
+
+    const size = matrix.length || 2;
+
+    const updateCell = (r, c, val) => {
+        const newMatrix = matrix.map(row => [...row]);
+        // Handle empty input gracefully by passing 0 to backend, but
+        // for UI we could let it be empty string if we wanted. But 0 is safer for API.
+        const intVal = parseInt(val, 10);
+        newMatrix[r][c] = isNaN(intVal) ? 0 : intVal;
+        onChange(JSON.stringify(newMatrix));
+    };
+
+    const toggleSize = (newSize) => {
+        if (size === newSize) return;
+        const newMatrix = newSize === 2 
+            ? [[0, 0], [0, 0]] 
+            : [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+        onChange(JSON.stringify(newMatrix));
+    };
+
+    const generateRandomMatrix = () => {
+        const gcd = (a, b) => b === 0 ? a : gcd(b, a % b);
+
+        const getDet2x2 = (m) => m[0][0]*m[1][1] - m[0][1]*m[1][0];
+        const getDet3x3 = (m) => {
+            return m[0][0]*(m[1][1]*m[2][2] - m[1][2]*m[2][1])
+                 - m[0][1]*(m[1][0]*m[2][2] - m[1][2]*m[2][0])
+                 + m[0][2]*(m[1][0]*m[2][1] - m[1][1]*m[2][0]);
+        };
+
+        // Continually generate random matrices until one is valid
+        while (true) {
+            const tempMatrix = [];
+            for (let r = 0; r < size; r++) {
+                const row = [];
+                for (let c = 0; c < size; c++) {
+                    row.push(Math.floor(Math.random() * 26)); // Hill cipher uses 0-25
+                }
+                tempMatrix.push(row);
+            }
+
+            const det = size === 2 ? getDet2x2(tempMatrix) : getDet3x3(tempMatrix);
+            const detMod26 = ((det % 26) + 26) % 26;
+
+            // Valid key matrix when determinant is coprime to 26
+            if (detMod26 !== 0 && gcd(detMod26, 26) === 1) {
+                onChange(JSON.stringify(tempMatrix));
+                break;
+            }
+        }
+    };
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2 }}
+            className="w-full flex flex-col gap-3"
+            key="hill"
+        >
+            <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-(--text-muted) tracking-wide uppercase">
+                    Hill Matrix Key
+                </label>
+                <div className="flex gap-1 p-1 rounded-md bg-[#fff5e9] border border-[#d4a053]/20">
+                    <button 
+                        onClick={() => toggleSize(2)} 
+                        className={`px-3 py-1 text-xs font-bold rounded transition-colors ${size === 2 ? 'bg-[#d4a053]/30 text-[#d4a053]' : 'text-(--text-muted) hover:bg-black/5'}`}
+                    >
+                        2x2
+                    </button>
+                    <button 
+                        onClick={() => toggleSize(3)} 
+                        className={`px-3 py-1 text-xs font-bold rounded transition-colors ${size === 3 ? 'bg-[#d4a053]/30 text-[#d4a053]' : 'text-(--text-muted) hover:bg-black/5'}`}
+                    >
+                        3x3
+                    </button>
+                </div>
+            </div>
+            
+            <div 
+                className="grid gap-2"
+                style={{ gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))` }}
+            >
+                {matrix.map((row, r) => (
+                    row.map((cell, c) => (
+                        <input
+                            key={`${r}-${c}`}
+                            type="number"
+                            value={cell.toString()}
+                            onChange={(e) => updateCell(r, c, e.target.value)}
+                            className="w-full px-2 py-3 text-center rounded-xl bg-[#fff5e9] border border-[#d4a053]/30 text-(--text-main) placeholder:text-(--text-muted) focus:outline-none focus:ring-2 focus:ring-[#d4a053]/50 transition-all duration-200 font-mono text-base font-bold appearance-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            placeholder="0"
+                        />
+                    ))
+                ))}
+            </div>
+
+            <button
+                onClick={generateRandomMatrix}
+                className="w-full flex items-center justify-center gap-2 mt-1 py-2 text-xs font-semibold text-(--text-muted) hover:text-(--text-main) bg-black/5 hover:bg-[#d4a053]/20 rounded-lg transition-colors border border-transparent hover:border-[#d4a053]/30"
+            >
+                <RefreshCw className="w-3.5 h-3.5" />
+                Generate Random Key Matrix
+            </button>
+        </motion.div>
+    );
+}
+
 /* ── Main component ─────────────────────────────────────────── */
 
 export function MethodSelector({ selected, onChange, keyValue, onKeyChange }) {
@@ -195,7 +310,7 @@ export function MethodSelector({ selected, onChange, keyValue, onKeyChange }) {
                         </motion.div>
                     )}
 
-                    {selected === 'vigenère' && (
+                    {selected === 'vigenere' && (
                         <motion.div key="vigenere">
                             <KeyInput
                                 label="Vigenère shift"
@@ -221,15 +336,7 @@ export function MethodSelector({ selected, onChange, keyValue, onKeyChange }) {
                     )}
 
                     {selected === 'hill' && (
-                        <motion.div key="hill">
-                            <KeyInput
-                                label="Hill cipher key"
-                                type="text"
-                                value={keyValue}
-                                onChange={onKeyChange}
-                                placeholder="Enter key string…"
-                            />
-                        </motion.div>
+                        <HillMatrixInput value={keyValue} onChange={onKeyChange} />
                     )}
 
                     {selected === 'rsa' && (

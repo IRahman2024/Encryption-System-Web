@@ -4,10 +4,34 @@ import { ModeToggle } from "@/components/custom/ModeToggle";
 import { TextPanel } from "@/components/custom/TextPanel";
 import { TypeToggle } from "@/components/custom/TypeToggle";
 import Image from "next/image";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { ArrowRightLeftIcon } from "lucide-react";
 import { FilePanel } from "@/components/custom/FilePanel";
+
+const CIPHER_CONFIG = {
+  caesar: {
+    endpoint: "/api/caesar"
+  },
+  vigenere: {
+    endpoint: "/api/vigenere",
+    prepareKey: (key) => parseInt(key, 10) || 0,
+  },
+  hill: {
+    endpoint: "/api/hillfair-cipher",
+    prepareKey: (key) => {
+      try {
+        return JSON.parse(key);
+      } catch {
+        return [[0, 0], [0, 0]]; // Fallback to avoid breaking JSON.stringify
+      }
+    },
+  },
+  playfair: {
+    endpoint: "/api/playfair-cipher",
+    prepareKey: (key) => key.trim(),
+  }
+};
 
 export default function Home() {
   const [mode, setMode] = useState('encrypt')
@@ -22,17 +46,70 @@ export default function Home() {
   const [outputText, setOutputText] = useState('')
 
   // console.log(inputText);
+  // console.log(mode);
+  // console.log(method, key);
   // console.log(file);
   // console.log(processedFile);
   // console.log(isProcessing);
-
 
   const handleMethodChange = (newMethod) => {
     setMethod(newMethod)
     // Reset key to sensible defaults when switching methods
     if (newMethod === 'caesar') setKey('3')
-    else if (newMethod === 'vigenere' || newMethod === 'xor') setKey('')
+    else setKey('')
   }
+
+  const handleCipherAction = useCallback(async () => {
+    if (!inputText) {
+      setOutputText('');
+      return;
+    }
+
+    const config = CIPHER_CONFIG[method];
+    if (!config) return;
+
+    try {
+      const payload = {
+        text: inputText,
+        mode: mode
+      };
+
+      if (config.prepareKey) {
+        payload.key = config.prepareKey(key);
+      }
+
+      const response = await fetch(config.endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Some endpoints return 'text', others return 'message: "mode: <result>"'
+      let result = data.text;
+      if (!result && data.message) {
+        result = data.message.replace(/^(encrypt: |decrypt: )/, '');
+      }
+
+      setOutputText(result || '');
+    } catch (error) {
+      console.error("Cipher Error:", error);
+      setOutputText("Error processing text. Check key format.");
+    }
+  }, [inputText, key, method, mode]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      handleCipherAction();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [handleCipherAction]);
 
   const itemVariants = {
     hidden: {
@@ -73,7 +150,7 @@ export default function Home() {
           <ModeToggle mode={mode} onChange={setMode} />
           <TypeToggle type={inputType} onChange={setInputType} />
         </div>
-        <div className='flex flex-wrap rounded-full my-5'>
+        <div className='flex justify-center mx-auto space-x-5 my-2'>
           <MethodSelector
             selected={method}
             onChange={handleMethodChange}

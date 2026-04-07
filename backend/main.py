@@ -11,6 +11,7 @@ app = FastAPI()
 
 class Caesar_Cipher_Request(BaseModel):  # only for request
     text: str
+    mode: str
 
 
 class Caesar_Cipher_Response(BaseModel):  # only for response
@@ -20,6 +21,7 @@ class Caesar_Cipher_Response(BaseModel):  # only for response
 class Text_Key_request(BaseModel):  # only for request
     text: str
     key: int
+    mode: str
 
 
 class Text_Response(BaseModel):  # only for response
@@ -94,14 +96,15 @@ class PlayfairCipher:
         return None
 
     def transform(self, text, mode='encrypt'):
-    # 1. Record the original positions of all spaces
-        space_indices = [i for i, char in enumerate(text) if char == ' ']
+        # 1. Extract non-alphabetic characters and their original positions
+        non_alpha = {i: char for i, char in enumerate(text) if not char.isalpha()}
         
         # 2. Define shift (1 for encrypt, 4 for decrypt as -1 % 5 = 4)
         shift = 1 if mode == 'encrypt' else 4
         
-        # 3. Clean and pair the text (removes spaces internally)
-        prepared_text = self._prepare_text(text, mode)
+        # 3. Clean and pair the text
+        cleaned_text = "".join(filter(str.isalpha, text))
+        prepared_text = self._prepare_text(cleaned_text, mode)
         result_list = []
 
         # 4. Standard Playfair Rules Logic
@@ -128,14 +131,12 @@ class PlayfairCipher:
                 result_list.append(self.matrix[r1][c2])
                 result_list.append(self.matrix[r2][c1])
 
-        # 5. Re-insert spaces back into the result string
-        for index in space_indices:
-            # If the index is within the current result, insert it
+        # 5. Re-insert non-alphabetic characters back into the result string
+        for index in sorted(non_alpha.keys()):
             if index < len(result_list):
-                result_list.insert(index, ' ')
+                result_list.insert(index, non_alpha[index])
             else:
-                # If the text grew (due to padding), add space to the end
-                result_list.append(' ')
+                result_list.append(non_alpha[index])
 
         return "".join(result_list)
 
@@ -199,10 +200,10 @@ class HillCipher:
             return adj
 
     def encrypt(self, text):
-        # 1. Record space positions
-        space_indices = [i for i, char in enumerate(text) if char == ' ']
+        # 1. Record non-alpha characters
+        non_alpha = {i: char for i, char in enumerate(text) if not char.isalpha()}
         
-        # 2. Clean text for processing (remove spaces)
+        # 2. Clean text for processing
         clean_text = "".join(filter(str.isalpha, text.upper()))
         
         # 3. Padding
@@ -217,21 +218,21 @@ class HillCipher:
                 dot_product = sum(row[j] * block[j] for j in range(self.n))
                 cipher_list.append(self._int_to_char(dot_product % 26))
         
-        # 5. Re-insert spaces into the result
-        for index in space_indices:
+        # 5. Re-insert non-alpha into the result
+        for index in sorted(non_alpha.keys()):
             if index < len(cipher_list):
-                cipher_list.insert(index, ' ')
+                cipher_list.insert(index, non_alpha[index])
             else:
-                cipher_list.append(' ')
+                cipher_list.append(non_alpha[index])
                 
         return "".join(cipher_list)
 
     def decrypt(self, cipher_text):
-        # 1. Record space positions
-        space_indices = [i for i, char in enumerate(cipher_text) if char == ' ']
+        # 1. Record non-alpha characters
+        non_alpha = {i: char for i, char in enumerate(cipher_text) if not char.isalpha()}
         
-        # 2. Clean text (remove spaces)
-        clean_cipher = cipher_text.replace(" ", "")
+        # 2. Clean text
+        clean_cipher = "".join(filter(str.isalpha, cipher_text.upper()))
         
         # 3. Get Inverted Matrix
         det = self._get_determinant(self.key_matrix) % 26
@@ -246,12 +247,12 @@ class HillCipher:
                 dot_product = sum(row[j] * block[j] for j in range(self.n))
                 plain_list.append(self._int_to_char(dot_product % 26))
         
-        # 5. Re-insert spaces
-        for index in space_indices:
+        # 5. Re-insert non-alpha
+        for index in sorted(non_alpha.keys()):
             if index < len(plain_list):
-                plain_list.insert(index, ' ')
+                plain_list.insert(index, non_alpha[index])
             else:
-                plain_list.append(' ')
+                plain_list.append(non_alpha[index])
                 
         return "".join(plain_list)
 
@@ -263,74 +264,42 @@ def read_root():
 
 
 # caesar-cipher
-# caesar-cipher encryption (plain-text)
-@app.post("/caesar-encrypt", response_model=Caesar_Cipher_Response)
+@app.post("/caesar", response_model=Caesar_Cipher_Response)
 def caesar_encrypt(payLoad: Caesar_Cipher_Request):
-    plaintext = payLoad.text
+    text = payLoad.text
     shift = 3
+    mode = payLoad.mode
     cipherText = ""
+    decryptedText = ""
 
-    for char in plaintext:
-        cipherText += chr((ord(char) - 32 + shift) % 95 + 32)
-
-    # test_PlainText.append(payLoad.text)
-    # print(payLoad)
-    test_CipherText = cipherText
-    print(f"this is the plain-Text: {plaintext}")
-    print(f"this is the chipher-Text: {cipherText}")
-    return {"text": cipherText}
-
-# caesar-cipher decryption (plain-text)
-@app.post("/caesar-decrypt", response_model=Caesar_Cipher_Response)
-def caesar_decrypt(payLoad: Caesar_Cipher_Request):
-    cipherText = payLoad.text
-    shift = 3
-    plainText = ""
-
-    for char in cipherText:
-        plainText += chr((ord(char) - 32 - shift) % 95 + 32)
-
-    # test_PlainText.append(payLoad.text)
-    # print(payLoad)
-    test_PlainText = plainText
-    print(f"this is the plain-Text: {cipherText}")
-    print(f"this is the chipher-Text: {plainText}")
-    return {"text": plainText}
-
+    if mode == 'encrypt':
+        for char in text:
+            cipherText += chr((ord(char) - 32 + shift) % 95 + 32)
+        return {"text": cipherText}    
+    else:
+        for char in text:
+            decryptedText += chr((ord(char) - 32 - shift) % 95 + 32)
+        return {"text": decryptedText}    
 
 # vigenère-cipher
-# vigenère-cipher encryption (plain-text)
-@app.post("/vigenere-encrypt", response_model=Text_Response)
+@app.post("/vigenere", response_model=Text_Response)
 def vigenere_encrypt(payLoad: Text_Key_request):
-    plaintext = payLoad.text
+    text = payLoad.text
     shift = payLoad.key
+    mode = payLoad.mode
     cipherText = ""
+    decryptedText = ""
 
-    for char in plaintext:
-        cipherText += chr((ord(char) - 32 + shift) % 95 + 32)
-
-    # test_PlainText.append(payLoad.text)
-    print(payLoad)
-    test_CipherText = cipherText
-    return {"text": cipherText}
-
-# vigenère-cipher decryption (plain-text)
-@app.post("/vigenere-decrypt", response_model=Text_Response)
-def vigenere_decrypt(payLoad: Text_Key_request):
-    cipherText = payLoad.text
-    shift = payLoad.key
-    plainText = ""
-
-    for char in cipherText:
-        plainText += chr((ord(char) - 32 - shift) % 95 + 32)
-
-    # test_PlainText.append(payLoad.text)
-    # print(payLoad)
-    test_PlainText = plainText
-    return {"text": plainText}
+    if mode == 'encrypt':
+        for char in text:
+            cipherText += chr((ord(char) - 32 + shift) % 95 + 32)
+        return {"text": cipherText}
+    else:
+        for char in text:
+            decryptedText += chr((ord(char) - 32 - shift) % 95 + 32)
+        return {"text": decryptedText}
 
 # playfair-cipher
-# playfair-cipher encryption
 @app.post("/playfair-cipher")
 def playfair_cipher(payload: Playfair_request):
     plaintext = payload.text
@@ -354,8 +323,6 @@ def playfair_cipher(payload: Playfair_request):
         print('this is decryption request')
         decrypted = cipher.transform(plaintext, mode='decrypt')
         return {"message": mode + ": " + decrypted}
-
-   
 
 # hillfair-cipher api
 @app.post("/hillfair-cipher", response_model=Hillfair_response)
