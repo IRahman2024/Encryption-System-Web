@@ -4,11 +4,12 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { KeyRound, RefreshCw } from 'lucide-react'
 
 const METHODS = [
-    { id: 'caesar',   label: 'Caesar'   },
-    { id: 'vigenere', label: 'Vigenère' },
-    { id: 'playfair', label: 'Playfair' },
-    { id: 'hill',     label: 'Hill'     },
-    { id: 'rsa',      label: 'RSA'      },
+    { id: 'caesar',   label: 'Caesar',   type: 'text' },
+    { id: 'vigenere', label: 'Vigenère', type: 'text' },
+    { id: 'playfair', label: 'Playfair', type: 'text' },
+    { id: 'hill',     label: 'Hill',     type: 'text' },
+    { id: 'rsa',      label: 'RSA',      type: 'file' },
+    { id: 'aes',      label: 'AES',      type: 'file' },
 ]
 
 function buildPlayfairGrid(rawKey) {
@@ -266,12 +267,12 @@ function HillMatrixInput({ value, onChange }) {
 
 /* ── Main component ─────────────────────────────────────────── */
 
-export function MethodSelector({ selected, onChange, keyValue, onKeyChange }) {
+export function MethodSelector({ selected, onChange, keyValue, onKeyChange, inputType }) {
     return (
         <div className="flex flex-col gap-4 justify-center mx-auto w-full">
             {/* Method buttons */}
             <div className="bg-[#fff5e9] p-3 mx-auto rounded-md">
-                {METHODS.map((method) => {
+                {METHODS.filter(m => m.type === inputType).map((method) => {
                     const isActive = selected === method.id
                     return (
                         <button
@@ -339,7 +340,7 @@ export function MethodSelector({ selected, onChange, keyValue, onKeyChange }) {
                         <HillMatrixInput value={keyValue} onChange={onKeyChange} />
                     )}
 
-                    {selected === 'rsa' && (
+                    {selected === 'rsa' && (!inputType || inputType === 'text') && (
                         <motion.div key="rsa">
                             <KeyInput
                                 label="RSA key"

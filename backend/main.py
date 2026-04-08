@@ -1,6 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
+import base64
+from rsa_cipher import FileRSACipher
 
 # In Python,
 # function and variable names usually use snake_case (e.g., test_plain_text),
@@ -8,6 +11,15 @@ from typing import List
 
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+cipher = FileRSACipher()
 
 class Caesar_Cipher_Request(BaseModel):  # only for request
     text: str
@@ -350,3 +362,51 @@ def hillfair_cipher(payload: Hillfair_request):
         print('this is decryption request')
         decrypted = cipher.decrypt(plaintext)
         return {"message": mode + ": " + decrypted}
+
+@app.post("/rsa-file-encrypt")
+async def encrypt_api(file: UploadFile = File(...)):
+    # Read the raw file
+    file_data = await file.read()
+    
+    # Server-side size limit: 100MB
+    if len(file_data) > 100 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File exceeds the 100MB size limit.")
+    
+    # Generate keys and encrypt
+    private_key = cipher.generate_keys()
+    enc_content, enc_aes_key = cipher.encrypt_file(file_data)
+    
+    # Return everything needed to the user
+    return {
+        "filename": file.filename,
+        "private_key": private_key,
+        "encrypted_aes_key": base64.b64encode(enc_aes_key).decode('utf-8'),
+        "encrypted_file": base64.b64encode(enc_content).decode('utf-8')
+    }
+
+@app.post("/rsa-file-decrypt")
+async def decrypt_api(
+    encrypted_file: UploadFile = File(...), 
+    encrypted_aes_key: str = Form(...), 
+    private_key: str = Form(...)
+):
+    try:
+        # Read the raw binary file directly
+        file_bytes = await encrypted_file.read()
+        
+        # Server-side size limit: 100MB
+        if len(file_bytes) > 100 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="File exceeds the 100MB size limit.")
+        
+        aes_key_bytes = base64.b64decode(encrypted_aes_key)
+        
+        # Decrypt
+        decrypted_data = cipher.decrypt_file(file_bytes, aes_key_bytes, private_key)
+        
+        return {
+            "message": "File decrypted successfully", 
+            "size": len(decrypted_data),
+            "decrypted_file": base64.b64encode(decrypted_data).decode('utf-8')
+        }
+    except Exception as e:
+        return {"error": str(e)}
