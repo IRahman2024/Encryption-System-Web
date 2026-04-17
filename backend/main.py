@@ -15,7 +15,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "https://encryption-system-web-front.vercel.app"
+        "https://kryptos-lab.vercel.app"
         ],
     # allow_origins=["https://encryption-system-web-front.vercel.app/"],
     allow_credentials=True,
