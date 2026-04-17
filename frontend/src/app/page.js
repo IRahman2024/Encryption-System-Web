@@ -132,7 +132,8 @@ export default function Home() {
           formData.append('file', file);
 
           // Send directly to FastAPI to bypass Next.js 10MB proxy limit
-          const endpoint = method === 'rsa' ? 'http://127.0.0.1:8000/rsa-file-encrypt' : 'http://127.0.0.1:8000/aes-file-encrypt';
+          // const endpoint = method === 'rsa' ? 'http://127.0.0.1:8000/rsa-file-encrypt' : 'http://127.0.0.1:8000/aes-file-encrypt';
+          const endpoint = method === 'rsa' ? 'https://encryption-system-web-1.onrender.com/rsa-file-encrypt' : 'https://encryption-system-web-1.onrender.com/aes-file-encrypt';
 
           const response = await fetch(endpoint, {
             method: 'POST',
@@ -225,7 +226,8 @@ export default function Home() {
           // else handle 'aes' specific form fields in the future
 
           // Send directly to FastAPI bypass Next.js proxy limit
-          const endpoint = method === 'rsa' ? 'http://127.0.0.1:8000/rsa-file-decrypt' : 'http://127.0.0.1:8000/aes-file-decrypt';
+          // const endpoint = method === 'rsa' ? 'http://127.0.0.1:8000/rsa-file-decrypt' : 'http://127.0.0.1:8000/aes-file-decrypt';
+          const endpoint = method === 'rsa' ? 'https://encryption-system-web-1.onrender.com/rsa-file-decrypt' : 'https://encryption-system-web-1.onrender.com/aes-file-decrypt';
 
           try {
             const response = await fetch(endpoint, {
