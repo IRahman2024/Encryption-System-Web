@@ -291,6 +291,7 @@ export default function Home() {
       <main className="w-full mx-45">
         <div className="flex p-10 flex-col justify-center items-center clearfix space-y-6">
           <Image
+            unoptimized
             src="/logo-2.gif"
             alt=""
             width="50"
