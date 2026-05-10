@@ -295,7 +295,8 @@ def caesar_encrypt(payLoad: Caesar_Cipher_Request):
 # vigenère-cipher
 @app.post("/vigenere", response_model=Text_Response)
 def vigenere_encrypt(payLoad: Text_Key_request):
-    print('vignare api hit', payLoad.text)
+    print('hit local vigenere cipher', payLoad.text)
+
     text = payLoad.text
     key = payLoad.key  # This should now be a string (e.g., "SECRET")
     mode = payLoad.mode
@@ -328,7 +329,7 @@ def playfair_cipher(payload: Playfair_request):
     key = payload.key
     mode = payload.mode
 
-    # print(mode)
+    print("hit local playfair cipher")
     
     cipher = PlayfairCipher(key)
     
@@ -356,6 +357,8 @@ def hillfair_cipher(payload: Hillfair_request):
     # print(plaintext)
     # print(key)
     # print(mode)
+
+    print("hit local hillfair cipher")
     
     cipher = HillCipher(key)
     
