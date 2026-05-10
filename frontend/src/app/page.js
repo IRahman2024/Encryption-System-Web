@@ -301,7 +301,7 @@ export default function Home() {
         <div className="flex p-10 flex-col justify-center items-center clearfix space-y-6">
           <Image
             unoptimized
-            src="/logo-2.gif"
+            src="/Logo-2.gif"
             alt=""
             width="50"
             height="50"
