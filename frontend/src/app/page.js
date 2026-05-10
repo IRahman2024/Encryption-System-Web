@@ -12,11 +12,12 @@ import JSZip from "jszip";
 
 const CIPHER_CONFIG = {
   caesar: {
-    endpoint: "/api/caesar"
+    endpoint: "/api/caesar",
+    prepareKey: (key) => parseInt(key, 10) || 3,
   },
   vigenere: {
     endpoint: "/api/vigenere",
-    prepareKey: (key) => parseInt(key, 10) || 0,
+    prepareKey: (key) => key,
   },
   hill: {
     endpoint: "/api/hillfair-cipher",
@@ -58,11 +59,14 @@ export default function Home() {
     setMethod(newMethod)
     // Reset key to sensible defaults when switching methods
     if (newMethod === 'caesar') setKey('3')
+    else if (newMethod === 'hill') setKey('[[0,0],[0,0]]')
     else setKey('')
   }
 
+  const isKeyMissing = ['vigenere', 'playfair', 'hill', 'caesar'].includes(method) && (!key || key.trim() === '');
+
   const handleCipherAction = useCallback(async () => {
-    if (!inputText) {
+    if (!inputText || isKeyMissing) {
       setOutputText('');
       return;
     }
@@ -77,7 +81,12 @@ export default function Home() {
       };
 
       if (config.prepareKey) {
-        payload.key = config.prepareKey(key);
+        const preparedKey = config.prepareKey(key);
+        if (method === 'caesar') {
+          payload.shift = preparedKey;
+        } else {
+          payload.key = preparedKey;
+        }
       }
 
       const response = await fetch(config.endpoint, {
@@ -132,8 +141,8 @@ export default function Home() {
           formData.append('file', file);
 
           // Send directly to FastAPI to bypass Next.js 10MB proxy limit
-          // const endpoint = method === 'rsa' ? 'http://127.0.0.1:8000/rsa-file-encrypt' : 'http://127.0.0.1:8000/aes-file-encrypt';
-          const endpoint = method === 'rsa' ? 'https://encryption-system-web-1.onrender.com/rsa-file-encrypt' : 'https://encryption-system-web-1.onrender.com/aes-file-encrypt';
+          const endpoint = method === 'rsa' ? 'http://127.0.0.1:8000/rsa-file-encrypt' : 'http://127.0.0.1:8000/aes-file-encrypt';
+          // const endpoint = method === 'rsa' ? 'https://encryption-system-web-1.onrender.com/rsa-file-encrypt' : 'https://encryption-system-web-1.onrender.com/aes-file-encrypt';
 
           const response = await fetch(endpoint, {
             method: 'POST',
@@ -226,8 +235,8 @@ export default function Home() {
           // else handle 'aes' specific form fields in the future
 
           // Send directly to FastAPI bypass Next.js proxy limit
-          // const endpoint = method === 'rsa' ? 'http://127.0.0.1:8000/rsa-file-decrypt' : 'http://127.0.0.1:8000/aes-file-decrypt';
-          const endpoint = method === 'rsa' ? 'https://encryption-system-web-1.onrender.com/rsa-file-decrypt' : 'https://encryption-system-web-1.onrender.com/aes-file-decrypt';
+          const endpoint = method === 'rsa' ? 'http://127.0.0.1:8000/rsa-file-decrypt' : 'http://127.0.0.1:8000/aes-file-decrypt';
+          // const endpoint = method === 'rsa' ? 'https://encryption-system-web-1.onrender.com/rsa-file-decrypt' : 'https://encryption-system-web-1.onrender.com/aes-file-decrypt';
 
           try {
             const response = await fetch(endpoint, {
@@ -335,6 +344,7 @@ export default function Home() {
                   onChange={setInputText}
                   placeholder={`Enter text to ${mode}...`}
                   onClear={() => setInputText('')}
+                  disabled={isKeyMissing}
                 />
               </div>
 
@@ -342,7 +352,7 @@ export default function Home() {
               <div className="flex justify-center items-center py-2 lg:py-0">
                 <button
                   onClick={handleSwap}
-                  disabled={!inputText && !outputText}
+                  disabled={(!inputText && !outputText) || isKeyMissing}
                   className="p-4 bg-(--panel-bg) text-(--accent) rounded-full shadow-lg hover:bg-(--panel-bg-hover) hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed group"
                   title="Swap input and output"
                   aria-label="Swap input and output"

@@ -8,6 +8,7 @@ export function TextPanel({
     placeholder,
     readOnly = false,
     onClear,
+    disabled = false,
 }) {
  
     const [copied, setCopied] = useState(false)
@@ -29,7 +30,7 @@ export function TextPanel({
     }
  
     return (
-        <div className="flex flex-col h-full bg-(--panel-bg) rounded-2xl border border-(--panel-border) overflow-hidden shadow-xl">
+        <div className={`flex flex-col h-full bg-(--panel-bg) rounded-2xl border border-(--panel-border) overflow-hidden shadow-xl transition-all duration-300 ${disabled ? 'opacity-60 cursor-not-allowed bg-black/5' : ''}`}>
             {/* Panel Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-(--panel-border) bg-black/10">
                 <span className="text-sm font-semibold text-(--panel-text) uppercase tracking-wider">
@@ -45,7 +46,8 @@ export function TextPanel({
                     {onClear && (
                         <button
                             onClick={onClear}
-                            className="p-1.5 text-(--panel-text-muted) hover:text-(--error) hover:bg-white/5 rounded-md transition-colors"
+                            disabled={disabled}
+                            className="p-1.5 text-(--panel-text-muted) hover:text-(--error) hover:bg-white/5 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Clear text"
                             aria-label="Clear text"
                         >
@@ -56,7 +58,7 @@ export function TextPanel({
                     {readOnly && (
                         <button
                             onClick={handleCopy}
-                            disabled={!value}
+                            disabled={!value || disabled}
                             className={`p-1.5 rounded-md transition-colors flex items-center gap-1.5 ${copied ? 'text-(--success) bg-(--success)/10' : 'text-(--panel-text-muted) hover:text-(--panel-text) hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed'}`}
                             title="Copy to clipboard"
                             aria-label="Copy to clipboard"
@@ -75,9 +77,10 @@ export function TextPanel({
                 <textarea
                     value={value}
                     onChange={(e) => onChange?.(e.target.value)}
-                    placeholder={placeholder}
+                    placeholder={disabled ? "Please enter a key to enable encryption..." : placeholder}
                     readOnly={readOnly}
-                    className="w-full h-full min-h-[200px] bg-transparent text-(--panel-text) placeholder-(--panel-text-muted)/50 font-mono text-sm resize-none focus:outline-none"
+                    disabled={disabled}
+                    className="w-full h-full min-h-[200px] bg-transparent text-(--panel-text) placeholder-(--panel-text-muted)/50 font-mono text-sm resize-none focus:outline-none disabled:cursor-not-allowed"
                     spellCheck={false}
                 />
             </div>

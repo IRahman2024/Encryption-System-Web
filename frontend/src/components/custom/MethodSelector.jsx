@@ -307,18 +307,24 @@ export function MethodSelector({ selected, onChange, keyValue, onKeyChange, inpu
                 <AnimatePresence mode="wait">
                     {selected === 'caesar' && (
                         <motion.div key="caesar">
-                            <CaesarBadge />
+                            <KeyInput
+                                label="Caesar Shift"
+                                type="number"
+                                value={keyValue}
+                                onChange={onKeyChange}
+                                placeholder="Enter shift number (default 3)…"
+                            />
                         </motion.div>
                     )}
 
                     {selected === 'vigenere' && (
                         <motion.div key="vigenere">
                             <KeyInput
-                                label="Vigenère shift"
-                                type="number"
+                                label="Vigenère Key"
+                                type="text"
                                 value={keyValue}
                                 onChange={onKeyChange}
-                                placeholder="Enter a number…"
+                                placeholder="Enter text key…"
                             />
                         </motion.div>
                     )}

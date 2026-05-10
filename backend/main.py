@@ -27,18 +27,16 @@ cipher = FileRSACipher()
 
 class Caesar_Cipher_Request(BaseModel):  # only for request
     text: str
+    shift: int
     mode: str
-
 
 class Caesar_Cipher_Response(BaseModel):  # only for response
     text: str
 
-
 class Text_Key_request(BaseModel):  # only for request
     text: str
-    key: int
+    key: str
     mode: str
-
 
 class Text_Response(BaseModel):  # only for response
     text: str
@@ -53,8 +51,6 @@ class Hillfair_request(BaseModel):  # only for request
     mode: str
 class Hillfair_response(BaseModel):  # only for request
     message: str
-
-
 class Playfair_Response(BaseModel):  # only for response
     text: str
 
@@ -283,37 +279,47 @@ def read_root():
 @app.post("/caesar", response_model=Caesar_Cipher_Response)
 def caesar_encrypt(payLoad: Caesar_Cipher_Request):
     text = payLoad.text
-    shift = 3
+    shift = payLoad.shift
     mode = payLoad.mode
-    cipherText = ""
-    decryptedText = ""
+    resultText = ""
 
     if mode == 'encrypt':
         for char in text:
-            cipherText += chr((ord(char) - 32 + shift) % 95 + 32)
-        return {"text": cipherText}    
+            resultText += chr((ord(char) - 32 + shift) % 95 + 32)
+        return {"text": resultText}    
     else:
         for char in text:
-            decryptedText += chr((ord(char) - 32 - shift) % 95 + 32)
-        return {"text": decryptedText}    
+            resultText += chr((ord(char) - 32 - shift) % 95 + 32)
+        return {"text": resultText}    
 
 # vigenère-cipher
 @app.post("/vigenere", response_model=Text_Response)
 def vigenere_encrypt(payLoad: Text_Key_request):
+    print('vignare api hit', payLoad.text)
     text = payLoad.text
-    shift = payLoad.key
+    key = payLoad.key  # This should now be a string (e.g., "SECRET")
     mode = payLoad.mode
-    cipherText = ""
-    decryptedText = ""
+    resultText = ""
+
+    # Pre-calculate shift values from the keyword string
+    # If your key is a string, we convert each char to its shift value
+    key_shifts = [ord(k) - 32 for k in key]
+    key_length = len(key_shifts)
 
     if mode == 'encrypt':
-        for char in text:
-            cipherText += chr((ord(char) - 32 + shift) % 95 + 32)
-        return {"text": cipherText}
-    else:
-        for char in text:
-            decryptedText += chr((ord(char) - 32 - shift) % 95 + 32)
-        return {"text": decryptedText}
+        for i, char in enumerate(text):
+            # Get the shift from the current position in the key
+            shift = key_shifts[i % key_length]
+            # Apply shift within the 95-character printable range
+            resultText += chr((ord(char) - 32 + shift) % 95 + 32)
+        return {"text": resultText}
+
+    else:  # Decrypt mode
+        for i, char in enumerate(text):
+            shift = key_shifts[i % key_length]
+            # Subtract shift
+            resultText += chr((ord(char) - 32 - shift) % 95 + 32)
+    return {"text": resultText}
 
 # playfair-cipher
 @app.post("/playfair-cipher")
