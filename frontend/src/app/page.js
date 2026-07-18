@@ -35,7 +35,7 @@ const CIPHER_CONFIG = {
   }
 };
 
-export default function Home() {
+export default function Home() { 
   const [mode, setMode] = useState('encrypt')
   const [inputType, setInputType] = useState('text')
   const [method, setMethod] = useState('caesar')
@@ -65,6 +65,7 @@ export default function Home() {
 
   const isKeyMissing = ['vigenere', 'playfair', 'hill', 'caesar'].includes(method) && (!key || key.trim() === '');
 
+  // api call and response 
   const handleCipherAction = useCallback(async () => {
     if (!inputText || isKeyMissing) {
       setOutputText('');
@@ -88,7 +89,7 @@ export default function Home() {
           payload.key = preparedKey;
         }
       }
-
+      // api call for algorithms
       const response = await fetch(config.endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -122,8 +123,8 @@ export default function Home() {
     return () => clearTimeout(timer);
   }, [handleCipherAction]);
 
+  // handles file upload for encryption
   const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
-
   const handleFileProcess = async () => {
     if (!file) return;
 
@@ -274,6 +275,7 @@ export default function Home() {
     setIsProcessing(false);
   }
 
+  // animation ui value
   const itemVariants = {
     hidden: {
       opacity: 0,
@@ -289,7 +291,7 @@ export default function Home() {
       },
     },
   }
-
+  // animation swap 
   const handleSwap = () => {
     setInputText(outputText)
     setMode(mode === 'encrypt' ? 'decrypt' : 'encrypt')
@@ -321,6 +323,7 @@ export default function Home() {
             }
           }} />
         </div>
+        {/*  algorithm select and api call*/}
         <div className='flex justify-center mx-auto space-x-5 my-2'>
           <MethodSelector
             selected={method}
@@ -330,6 +333,7 @@ export default function Home() {
             inputType={inputType}
           />
         </div>
+        {/* input and output */}
         <motion.div
           variants={itemVariants}
           className={`grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-4 lg:gap-6 items-stretch mt-4`}

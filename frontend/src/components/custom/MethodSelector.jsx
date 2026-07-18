@@ -12,6 +12,7 @@ const METHODS = [
     { id: 'aes',      label: 'AES',      type: 'file' },
 ]
 
+// design of grid
 function buildPlayfairGrid(rawKey) {
     const keyLetters = rawKey
         .toUpperCase()

@@ -81,7 +81,10 @@ class PlayfairCipher:
         """Cleans text, handles J->I, and creates digraphs with padding."""
         text = text.upper().replace('J', 'I').replace(" ", "")
         if mode == 'decrypt':
-            return text # Decryption assumes text is already in pairs
+            # Ciphertext must be even-length; pad with 'X' if not
+            if len(text) % 2 != 0:
+                text += 'X'
+            return text
 
         prepared = ""
         i = 0
@@ -246,9 +249,13 @@ class HillCipher:
         # 2. Clean text
         clean_cipher = "".join(filter(str.isalpha, cipher_text.upper()))
         
-        # 3. Get Inverted Matrix
+        # 3. Pad so length is a multiple of block size n
+        while len(clean_cipher) % self.n != 0:
+            clean_cipher += 'X'
+        
+        # 4. Get Inverted Matrix — raises ValueError if key is singular
         det = self._get_determinant(self.key_matrix) % 26
-        det_inv = self._mod_inverse(det, 26)
+        det_inv = self._mod_inverse(det, 26)  # raises ValueError if no inverse
         adjugate = self._get_adjugate_matrix(self.key_matrix)
         inv_key = [[(det_inv * cell) % 26 for cell in row] for row in adjugate]
 
@@ -373,7 +380,10 @@ def hillfair_cipher(payload: Hillfair_request):
         return {"message": mode + ": " + encrypted}
     else:
         print('this is decryption request')
-        decrypted = cipher.decrypt(plaintext)
+        try:
+            decrypted = cipher.decrypt(plaintext)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         return {"message": mode + ": " + decrypted}
 
 @app.post("/rsa-file-encrypt")
@@ -397,6 +407,7 @@ async def encrypt_api(file: UploadFile = File(...)):
         "encrypted_file": base64.b64encode(enc_content).decode('utf-8')
     }
 
+# file encryption
 @app.post("/rsa-file-decrypt")
 async def decrypt_api(
     encrypted_file: UploadFile = File(...), 
