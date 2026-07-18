@@ -3,11 +3,11 @@ import { MethodSelector } from "@/components/custom/MethodSelector";
 import { ModeToggle } from "@/components/custom/ModeToggle";
 import { TextPanel } from "@/components/custom/TextPanel";
 import { TypeToggle } from "@/components/custom/TypeToggle";
-import Image from "next/image";
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
-import { ArrowRightLeftIcon, PlayIcon } from "lucide-react";
+import { ArrowRightLeftIcon, BinaryIcon, KeyRoundIcon, PlayIcon, ShieldCheckIcon, SparklesIcon } from "lucide-react";
 import { FilePanel } from "@/components/custom/FilePanel";
+import { CipherVisualizer } from "@/components/custom/CipherVisualizer";
 import JSZip from "jszip";
 
 const CIPHER_CONFIG = {
@@ -25,7 +25,7 @@ const CIPHER_CONFIG = {
       try {
         return JSON.parse(key);
       } catch {
-        return [[0, 0], [0, 0]]; // Fallback to avoid breaking JSON.stringify
+        return [[0, 0], [0, 0]];
       }
     },
   },
@@ -35,11 +35,37 @@ const CIPHER_CONFIG = {
   }
 };
 
-export default function Home() { 
+const BIT_SEEDS = [
+  '0100110011010010110100101101',
+  '1011001010110100101001011010',
+  '0010110100101101011010010011',
+  '1100100101101001011010010110',
+  '0110101100100101101010011010',
+];
+
+const binaryColumns = Array.from({ length: 64 }, (_, index) => {
+  const length = 20 + ((index * 7) % 25);
+  const seed = BIT_SEEDS[index % BIT_SEEDS.length];
+  const offset = (index * 3) % seed.length;
+  const source = seed.repeat(Math.ceil((length + offset) / seed.length) + 1);
+
+  return {
+    bits: source.slice(offset, offset + length),
+    left: `${(index * 1.61 + (index % 5) * 0.19) % 100}%`,
+    delay: `-${((index * 1.37) % 12).toFixed(2)}s`,
+    duration: `${(6.5 + (index % 9) * 0.62).toFixed(2)}s`,
+    opacity: (0.16 + (index % 6) * 0.055).toFixed(2),
+    size: `${(0.58 + (index % 4) * 0.055).toFixed(2)}rem`,
+    blur: index % 11 === 0 ? '0.9px' : index % 5 === 0 ? '0.35px' : '0px',
+    drift: `${((index % 5) - 2) * 7}px`,
+  };
+});
+
+export default function Home() {
   const [mode, setMode] = useState('encrypt')
   const [inputType, setInputType] = useState('text')
   const [method, setMethod] = useState('caesar')
-  const [key, setKey] = useState('3') // Default key for Caesar
+  const [key, setKey] = useState('3')
 
   const [inputText, setInputText] = useState('')
   const [file, setFile] = useState(null)
@@ -47,17 +73,10 @@ export default function Home() {
   const [processedFile, setProcessedFile] = useState(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [outputText, setOutputText] = useState('')
-
-  // console.log(inputText);
-  // console.log(mode);
-  // console.log(method, key);
-  console.log(file);
-  // console.log(processedFile);
-  // console.log(isProcessing);
+  const [ambientMotion, setAmbientMotion] = useState(true)
 
   const handleMethodChange = (newMethod) => {
     setMethod(newMethod)
-    // Reset key to sensible defaults when switching methods
     if (newMethod === 'caesar') setKey('3')
     else if (newMethod === 'hill') setKey('[[0,0],[0,0]]')
     else setKey('')
@@ -65,7 +84,6 @@ export default function Home() {
 
   const isKeyMissing = ['vigenere', 'playfair', 'hill', 'caesar'].includes(method) && (!key || key.trim() === '');
 
-  // api call and response 
   const handleCipherAction = useCallback(async () => {
     if (!inputText || isKeyMissing) {
       setOutputText('');
@@ -89,7 +107,7 @@ export default function Home() {
           payload.key = preparedKey;
         }
       }
-      // api call for algorithms
+
       const response = await fetch(config.endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -102,7 +120,6 @@ export default function Home() {
 
       const data = await response.json();
 
-      // Some endpoints return 'text', others return 'message: "mode: <result>"'
       let result = data.text;
       if (!result && data.message) {
         result = data.message.replace(/^(encrypt: |decrypt: )/, '');
@@ -113,7 +130,7 @@ export default function Home() {
       console.error("Cipher Error:", error);
       setOutputText("Error processing text. Check key format.");
     }
-  }, [inputText, key, method, mode]);
+  }, [inputText, key, method, mode, isKeyMissing]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -123,8 +140,8 @@ export default function Home() {
     return () => clearTimeout(timer);
   }, [handleCipherAction]);
 
-  // handles file upload for encryption
-  const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+  const MAX_FILE_SIZE = 100 * 1024 * 1024;
+
   const handleFileProcess = async () => {
     if (!file) return;
 
@@ -141,8 +158,6 @@ export default function Home() {
           const formData = new FormData();
           formData.append('file', file);
 
-          // Send directly to FastAPI to bypass Next.js 10MB proxy limit
-          // const endpoint = method === 'rsa' ? 'http://127.0.0.1:8000/rsa-file-encrypt' : 'http://127.0.0.1:8000/aes-file-encrypt';
           const endpoint = method === 'rsa' ? 'https://encryption-system-web-1.onrender.com/rsa-file-encrypt' : 'https://encryption-system-web-1.onrender.com/aes-file-encrypt';
 
           const response = await fetch(endpoint, {
@@ -156,21 +171,18 @@ export default function Home() {
           if (data.encrypted_file) {
             const encFileBytes = Uint8Array.from(atob(data.encrypted_file), c => c.charCodeAt(0));
 
-            // Extract original extension from filename (e.g. ".mp4" from "plan.mp4")
             const extIndex = data.filename.lastIndexOf('.');
             const originalExt = extIndex !== -1 ? data.filename.substring(extIndex) : '';
             const baseName = extIndex !== -1 ? data.filename.substring(0, extIndex) : data.filename;
 
-            // Build .enc file: [2-byte ext length][ext string][encrypted bytes]
             const extBytes = new TextEncoder().encode(originalExt);
             const header = new Uint8Array(2);
-            new DataView(header.buffer).setUint16(0, extBytes.length, true); // little-endian
+            new DataView(header.buffer).setUint16(0, extBytes.length, true);
             const encWithHeader = new Uint8Array(header.length + extBytes.length + encFileBytes.length);
             encWithHeader.set(header, 0);
             encWithHeader.set(extBytes, 2);
             encWithHeader.set(encFileBytes, 2 + extBytes.length);
 
-            // Auto-bundle into ZIP for RSA
             if (method === 'rsa' && data.private_key && data.encrypted_aes_key) {
               const zip = new JSZip();
 
@@ -196,7 +208,6 @@ export default function Home() {
               });
             }
           } else {
-            // Future handling for other responses
             alert("Processed successfully, but no file returned.");
           }
 
@@ -217,14 +228,12 @@ export default function Home() {
             return;
           }
 
-          // Read the .enc file and extract the embedded extension header
           const encArrayBuffer = await file.arrayBuffer();
           const encAllBytes = new Uint8Array(encArrayBuffer);
           const extLength = new DataView(encArrayBuffer).getUint16(0, true);
           const originalExt = new TextDecoder().decode(encAllBytes.slice(2, 2 + extLength));
           const rawEncryptedBytes = encAllBytes.slice(2 + extLength);
 
-          // Send only the raw encrypted data (without header) to backend
           const encBlob = new Blob([rawEncryptedBytes], { type: 'application/octet-stream' });
           const formData = new FormData();
           formData.append('encrypted_file', encBlob, 'encrypted.bin');
@@ -233,16 +242,13 @@ export default function Home() {
             formData.append('encrypted_aes_key', keyData.encrypted_aes_key);
             formData.append('private_key', keyData.private_key);
           }
-          // else handle 'aes' specific form fields in the future
 
-          // Send directly to FastAPI bypass Next.js proxy limit
-          // const endpoint = method === 'rsa' ? 'http://127.0.0.1:8000/rsa-file-decrypt' : 'http://127.0.0.1:8000/aes-file-decrypt';
           const endpoint = method === 'rsa' ? 'https://encryption-system-web-1.onrender.com/rsa-file-decrypt' : 'https://encryption-system-web-1.onrender.com/aes-file-decrypt';
 
           try {
             const response = await fetch(endpoint, {
-                method: 'POST',
-                body: formData,
+              method: 'POST',
+              body: formData,
             });
             if (!response.ok) throw new Error('Decryption failed');
             const data = await response.json();
@@ -251,7 +257,6 @@ export default function Home() {
               const decFileBytes = Uint8Array.from(atob(data.decrypted_file), c => c.charCodeAt(0));
               const decBlob = new Blob([decFileBytes], { type: 'application/octet-stream' });
 
-              // Restore original filename with extension from .enc header
               const encBaseName = file.name.replace('.enc', '') || 'decrypted_file';
               setProcessedFile({
                 blob: decBlob,
@@ -275,12 +280,8 @@ export default function Home() {
     setIsProcessing(false);
   }
 
-  // animation ui value
   const itemVariants = {
-    hidden: {
-      opacity: 0,
-      y: 20,
-    },
+    hidden: { opacity: 0, y: 20 },
     show: {
       opacity: 1,
       y: 0,
@@ -291,56 +292,120 @@ export default function Home() {
       },
     },
   }
-  // animation swap 
+
   const handleSwap = () => {
     setInputText(outputText)
     setMode(mode === 'encrypt' ? 'decrypt' : 'encrypt')
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center font-sans bg-[#e8dbcc] dark:bg-black py-10">
-      <main className="w-full mx-45">
-        <div className="flex p-10 flex-col justify-center items-center clearfix space-y-6">
-          <Image
-            unoptimized
-            src="/Logo-2.gif"
-            alt=""
-            width="50"
-            height="50"
-            className="rounded-xl" />
-          <h1 className="text-4xl font-bold">Cipher Studio</h1>
-          <p className="text-center text-gray-500">Securer client-side text encryption. Choose your method, enter your key,
-            and protect your messages instantly.</p>
+    <div data-mode={mode} className="cipher-shell relative min-h-screen overflow-hidden font-sans text-[var(--text-main)]">
+      {ambientMotion && (
+        <div className="binary-rain pointer-events-none fixed inset-0 overflow-hidden" aria-hidden="true">
+          {binaryColumns.map((column, index) => (
+            <span
+              key={index}
+              className="binary-stream"
+              style={{
+                left: column.left,
+                animationDelay: column.delay,
+                animationDuration: column.duration,
+                '--stream-opacity': column.opacity,
+                '--stream-size': column.size,
+                '--stream-blur': column.blur,
+                '--stream-drift': column.drift,
+              }}
+            >
+              {[...column.bits].map((bit, bitIndex) => (
+                <span key={bitIndex} className="binary-digit">{bit}</span>
+              ))}
+            </span>
+          ))}
         </div>
-        <div className="flex justify-center flex-wrap mx-auto space-x-5 my-2">
-          <ModeToggle mode={mode} onChange={setMode} />
-          <TypeToggle type={inputType} onChange={(newType) => {
-            setInputType(newType);
-            if (newType === 'text' && ['rsa', 'aes'].includes(method)) {
-              setMethod('caesar');
-            } else if (newType === 'file' && !['rsa', 'aes'].includes(method)) {
-              setMethod('rsa');
-            }
-          }} />
-        </div>
-        {/*  algorithm select and api call*/}
-        <div className='flex justify-center mx-auto space-x-5 my-2'>
-          <MethodSelector
-            selected={method}
-            onChange={handleMethodChange}
-            keyValue={key}
-            onKeyChange={setKey}
-            inputType={inputType}
-          />
-        </div>
-        {/* input and output */}
+      )}
+
+      <main className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <header className="grid gap-5 rounded-lg border border-[var(--glass-border)] bg-[var(--glass-bg)] p-5 shadow-[var(--shell-shadow)] backdrop-blur-xl sm:p-7 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-[var(--accent)]/40 bg-[var(--accent-soft)] text-[var(--accent)] shadow-[0_0_28px_var(--accent-glow)]">
+                <ShieldCheckIcon className="h-6 w-6" />
+              </div>
+              <div>
+                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--text-muted)]">
+                  <BinaryIcon className="h-4 w-4 text-[var(--accent)]" />
+                  Crypto Algorithm Console
+                </p>
+                <h1 className="mt-1 text-4xl font-black text-[var(--text-main)] sm:text-5xl">
+                  Cipher Studio
+                </h1>
+              </div>
+            </div>
+            <p className="max-w-3xl text-sm leading-6 text-[var(--text-muted)] sm:text-base">
+              Encrypt text, decrypt messages, and process protected files from one focused control room.
+            </p>
+          </div>
+
+          <div className="space-y-3 sm:min-w-[360px]">
+            <button
+              type="button"
+              onClick={() => setAmbientMotion(current => !current)}
+              className="ml-auto flex items-center gap-2 rounded-md border border-[var(--panel-border)] bg-black/20 px-3 py-2 text-xs font-bold text-[var(--text-muted)] transition-all hover:border-[var(--accent)]/50 hover:text-[var(--accent)]"
+              aria-pressed={ambientMotion}
+            >
+              {ambientMotion ? 'Pause ambient motion' : 'Resume ambient motion'}
+            </button>
+            <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="rounded-lg border border-[var(--glass-border)] bg-black/20 p-3">
+              <SparklesIcon className="mx-auto mb-2 h-5 w-5 text-[var(--accent)]" />
+              <p className="text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">Mode</p>
+              <p className="mt-1 text-sm font-bold capitalize">{mode}</p>
+            </div>
+            <div className="rounded-lg border border-[var(--glass-border)] bg-black/20 p-3">
+              <KeyRoundIcon className="mx-auto mb-2 h-5 w-5 text-[var(--accent-2)]" />
+              <p className="text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">Method</p>
+              <p className="mt-1 text-sm font-bold uppercase">{method}</p>
+            </div>
+            <div className="rounded-lg border border-[var(--glass-border)] bg-black/20 p-3">
+              <BinaryIcon className="mx-auto mb-2 h-5 w-5 text-[var(--accent-3)]" />
+              <p className="text-xs uppercase tracking-[0.16em] text-[var(--text-muted)]">Input</p>
+              <p className="mt-1 text-sm font-bold capitalize">{inputType}</p>
+            </div>
+            </div>
+          </div>
+        </header>
+
+        <section className="mt-5 rounded-lg border border-[var(--glass-border)] bg-[var(--glass-bg)] p-4 shadow-[var(--shell-shadow)] backdrop-blur-xl sm:p-5">
+          <div className="flex flex-col items-center justify-between gap-4 xl:flex-row">
+            <div className="flex flex-wrap justify-center gap-3">
+              <ModeToggle mode={mode} onChange={setMode} />
+              <TypeToggle type={inputType} onChange={(newType) => {
+                setInputType(newType);
+                if (newType === 'text' && ['rsa', 'aes'].includes(method)) {
+                  setMethod('caesar');
+                } else if (newType === 'file' && !['rsa', 'aes'].includes(method)) {
+                  setMethod('rsa');
+                }
+              }} />
+            </div>
+            <MethodSelector
+              selected={method}
+              onChange={handleMethodChange}
+              keyValue={key}
+              onKeyChange={setKey}
+              inputType={inputType}
+            />
+          </div>
+        </section>
+
         <motion.div
           variants={itemVariants}
-          className={`grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-4 lg:gap-6 items-stretch mt-4`}
+          initial="hidden"
+          animate="show"
+          className="mt-5 grid grid-cols-1 items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:gap-5"
         >
           {inputType === 'text' ? (
             <>
-              {/* Left Panel: Input */}
               <div className="h-[400px] lg:h-[500px]">
                 <TextPanel
                   label={mode === 'encrypt' ? 'Plaintext' : 'Ciphertext'}
@@ -352,12 +417,11 @@ export default function Home() {
                 />
               </div>
 
-              {/* Middle Controls (Swap) */}
               <div className="flex justify-center items-center py-2 lg:py-0">
                 <button
                   onClick={handleSwap}
                   disabled={(!inputText && !outputText) || isKeyMissing}
-                  className="p-4 bg-(--panel-bg) text-(--accent) rounded-full shadow-lg hover:bg-(--panel-bg-hover) hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed group"
+                  className="group rounded-full border border-[var(--accent)]/40 bg-[var(--control-bg)] p-4 text-[var(--accent)] shadow-[0_0_30px_var(--accent-glow)] transition-all hover:scale-105 hover:border-[var(--accent)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
                   title="Swap input and output"
                   aria-label="Swap input and output"
                 >
@@ -365,7 +429,6 @@ export default function Home() {
                 </button>
               </div>
 
-              {/* Right Panel: Output */}
               <div className="h-[400px] lg:h-[500px]">
                 <TextPanel
                   label={mode === 'encrypt' ? 'Ciphertext' : 'Plaintext'}
@@ -377,14 +440,11 @@ export default function Home() {
             </>
           ) : (
             <>
-              {/* Left Panel: File Upload */}
               <div className="flex flex-col gap-4 h-[400px] lg:h-[500px]">
                 <div className={['rsa', 'aes'].includes(method) && mode === 'decrypt' ? 'h-1/2' : 'h-full'}>
                   <FilePanel
                     variant="upload"
-                    label={
-                      mode === 'encrypt' ? 'File to Encrypt' : 'Encrypted File'
-                    }
+                    label={mode === 'encrypt' ? 'File to Encrypt' : 'Encrypted File'}
                     file={file}
                     onFileSelect={setFile}
                     onClear={() => {
@@ -406,12 +466,11 @@ export default function Home() {
                 )}
               </div>
 
-              {/* Middle Controls (Process) */}
               <div className="flex justify-center items-center py-2 lg:py-0">
                 <button
                   onClick={handleFileProcess}
                   disabled={!file || (['rsa', 'aes'].includes(method) && mode === 'decrypt' && !keyFile) || isProcessing}
-                  className="p-4 bg-(--panel-bg) text-(--accent) rounded-full shadow-lg hover:bg-(--panel-bg-hover) hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed group flex flex-col items-center justify-center gap-1"
+                  className="group flex flex-col items-center justify-center gap-1 rounded-full border border-[var(--accent)]/40 bg-[var(--control-bg)] p-4 text-[var(--accent)] shadow-[0_0_30px_var(--accent-glow)] transition-all hover:scale-105 hover:border-[var(--accent)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100"
                   title="Process File"
                   aria-label="Process File"
                 >
@@ -420,13 +479,10 @@ export default function Home() {
                 </button>
               </div>
 
-              {/* Right Panel: File Download */}
               <div className="h-[400px] lg:h-[500px]">
                 <FilePanel
                   variant="download"
-                  label={
-                    mode === 'encrypt' ? 'Encrypted File' : 'Decrypted File'
-                  }
+                  label={mode === 'encrypt' ? 'Encrypted File' : 'Decrypted File'}
                   processedFile={processedFile}
                   isProcessing={isProcessing}
                 />
@@ -434,7 +490,21 @@ export default function Home() {
             </>
           )}
         </motion.div>
+
+        {inputType === 'text' && (
+          <CipherVisualizer
+            key={`${method}-${mode}-${key}-${inputText}`}
+            method={method}
+            text={inputText}
+            output={outputText}
+            keyValue={key}
+            mode={mode}
+          />
+        )}
       </main>
     </div>
   );
 }
+
+
+
