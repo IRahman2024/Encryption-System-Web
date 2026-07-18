@@ -1,14 +1,13 @@
-import React from 'react'
+﻿import React from 'react'
 import { motion } from 'framer-motion'
 import { FileTextIcon, FileIcon } from 'lucide-react'
 
 export function TypeToggle({ type, onChange }) {
-    const newLocal = "relative flex items-center p-1 bg-(--panel-bg) rounded-full border border-[var(--panel-border)] shadow-inner"
   return (
-    <div className={newLocal}>
+    <div className="relative flex items-center rounded-full border border-[var(--panel-border)] bg-[var(--control-bg)] p-1 shadow-inner shadow-black/40">
       <button
         onClick={() => onChange('text')}
-        className={`relative z-10 flex items-center gap-2 px-6 py-2.5 text-sm font-medium rounded-full transition-colors ${type === 'text' ? 'text-(--panel-bg)' : 'text-(--panel-text-muted) hover:text-(--panel-text)'}`}
+        className={`relative z-10 flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold transition-colors sm:px-6 ${type === 'text' ? 'text-[#031014]' : 'text-[var(--panel-text-muted)] hover:text-[var(--panel-text)]'}`}
       >
         <FileTextIcon size={16} />
         Text
@@ -16,24 +15,17 @@ export function TypeToggle({ type, onChange }) {
 
       <button
         onClick={() => onChange('file')}
-        className={`relative z-10 flex items-center gap-2 px-6 py-2.5 text-sm font-medium rounded-full transition-colors ${type === 'file' ? 'text-(--panel-bg)' : 'text-(--panel-text-muted) hover:text-(--panel-text)'}`}
+        className={`relative z-10 flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold transition-colors sm:px-6 ${type === 'file' ? 'text-[#031014]' : 'text-[var(--panel-text-muted)] hover:text-[var(--panel-text)]'}`}
       >
         <FileIcon size={16} />
         File
       </button>
 
-      {/* Animated Background Pill */}
       <motion.div
-        className="absolute top-1 bottom-1 w-[calc(50%-4px)] bg-accent rounded-full shadow-sm"
+        className="absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-full bg-[var(--accent-2)] shadow-[0_0_22px_rgba(182,255,92,0.24)]"
         initial={false}
-        animate={{
-          left: type === 'text' ? '4px' : 'calc(50%)',
-        }}
-        transition={{
-          type: 'spring',
-          stiffness: 400,
-          damping: 30,
-        }}
+        animate={{ left: type === 'text' ? '4px' : 'calc(50%)' }}
+        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
       />
     </div>
   )
