@@ -226,7 +226,7 @@ function HillMatrixInput({ value, onChange }) {
     );
 }
 
-export function MethodSelector({ selected, onChange, keyValue, onKeyChange, inputType }) {
+export function MethodSelector({ selected, onChange, keyValue, onKeyChange, inputType, bruteForce = false, onBruteForceChange }) {
     return (
         <div className="flex w-full flex-col gap-4">
             <div className={`grid w-full gap-2 ${inputType === 'text' ? 'sm:grid-cols-2 xl:grid-cols-4' : 'sm:grid-cols-2'}`}>
@@ -263,7 +263,7 @@ export function MethodSelector({ selected, onChange, keyValue, onKeyChange, inpu
             <div className="w-full max-w-md px-1">
                 <AnimatePresence mode="wait">
                     {selected === 'caesar' && (
-                        <motion.div key="caesar">
+                        <motion.div key="caesar" className="flex flex-col gap-3">
                             <KeyInput
                                 label="Caesar Shift"
                                 type="number"
@@ -271,6 +271,15 @@ export function MethodSelector({ selected, onChange, keyValue, onKeyChange, inpu
                                 onChange={onKeyChange}
                                 placeholder="Enter shift number"
                             />
+                            <label className="flex cursor-pointer select-none items-center gap-2 text-xs font-bold uppercase tracking-[0.18em] text-[var(--text-muted)] transition-colors hover:text-[var(--accent)]">
+                                <input
+                                    type="checkbox"
+                                    checked={!!bruteForce}
+                                    onChange={event => onBruteForceChange?.(event.target.checked)}
+                                    className="h-4 w-4 cursor-pointer accent-[var(--accent)]"
+                                />
+                                Brute Force
+                            </label>
                         </motion.div>
                     )}
 

@@ -134,6 +134,19 @@ export const requiresKey = (method) => {
     return ['caesar', 'vigenere', 'xor'].includes(method)
 }
 
+export async function runCaesarBruteForce(ciphertext) {
+    const response = await fetch('/api/caesar/bruteforce', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: ciphertext || '' }),
+    })
+    if (!response.ok) {
+        throw new Error(`Brute-force request failed (${response.status})`)
+    }
+    const data = await response.json()
+    return Array.isArray(data?.candidates) ? data.candidates : []
+}
+
 export const getKeyPlaceholder = (method) => {
     switch (method) {
         case 'caesar':

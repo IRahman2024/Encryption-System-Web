@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import { ArrowRightLeftIcon, BinaryIcon, KeyRoundIcon, PlayIcon, ShieldCheckIcon, SparklesIcon } from "lucide-react";
 import { FilePanel } from "@/components/custom/FilePanel";
 import { CipherVisualizer } from "@/components/custom/CipherVisualizer";
+import { BruteForcePanel } from "@/components/custom/BruteForcePanel";
 import JSZip from "jszip";
 
 const CIPHER_CONFIG = {
@@ -74,12 +75,14 @@ export default function Home() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [outputText, setOutputText] = useState('')
   const [ambientMotion, setAmbientMotion] = useState(true)
+  const [bruteForce, setBruteForce] = useState(false)
 
   const handleMethodChange = (newMethod) => {
     setMethod(newMethod)
     if (newMethod === 'caesar') setKey('3')
     else if (newMethod === 'hill') setKey('[[0,0],[0,0]]')
     else setKey('')
+    setBruteForce(false)
   }
 
   const isKeyMissing = ['vigenere', 'playfair', 'hill', 'caesar'].includes(method) && (!key || key.trim() === '');
@@ -394,6 +397,8 @@ export default function Home() {
               keyValue={key}
               onKeyChange={setKey}
               inputType={inputType}
+              bruteForce={bruteForce}
+              onBruteForceChange={setBruteForce}
             />
           </div>
         </section>
@@ -492,14 +497,18 @@ export default function Home() {
         </motion.div>
 
         {inputType === 'text' && (
-          <CipherVisualizer
-            key={`${method}-${mode}-${key}-${inputText}`}
-            method={method}
-            text={inputText}
-            output={outputText}
-            keyValue={key}
-            mode={mode}
-          />
+          method === 'caesar' && bruteForce && mode === 'decrypt' ? (
+            <BruteForcePanel ciphertext={inputText} />
+          ) : (
+            <CipherVisualizer
+              key={`${method}-${mode}-${key}-${inputText}-${bruteForce ? 'bf' : 'trace'}`}
+              method={method}
+              text={inputText}
+              output={outputText}
+              keyValue={key}
+              mode={mode}
+            />
+          )
         )}
       </main>
     </div>
