@@ -399,6 +399,7 @@ export default function Home() {
               inputType={inputType}
               bruteForce={bruteForce}
               onBruteForceChange={setBruteForce}
+              mode={mode}
             />
           </div>
         </section>
