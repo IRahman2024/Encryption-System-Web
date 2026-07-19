@@ -292,12 +292,20 @@ def caesar_encrypt(payLoad: Caesar_Cipher_Request):
 
     if mode == 'encrypt':
         for char in text:
-            resultText += chr((ord(char) - 32 + shift) % 95 + 32)
-        return {"text": resultText}    
+            if char.isalpha():
+                base = ord('A') if char.isupper() else ord('a')
+                resultText += chr((ord(char) - base + shift) % 26 + base)
+            else:
+                resultText += char
+        return {"text": resultText}
     else:
         for char in text:
-            resultText += chr((ord(char) - 32 - shift) % 95 + 32)
-        return {"text": resultText}    
+            if char.isalpha():
+                base = ord('A') if char.isupper() else ord('a')
+                resultText += chr((ord(char) - base - shift) % 26 + base)
+            else:
+                resultText += char
+        return {"text": resultText}
 
 # vigenère-cipher
 @app.post("/vigenere", response_model=Text_Response)
