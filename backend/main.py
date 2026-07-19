@@ -1,9 +1,12 @@
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
 import base64
 from rsa_cipher import FileRSACipher
+from aes_cipher import FileAESCipher
 
 # In Python,
 # function and variable names usually use snake_case (e.g., test_plain_text),
@@ -24,6 +27,16 @@ app.add_middleware(
 )
 
 cipher = FileRSACipher()
+aes_cipher = FileAESCipher()
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Surface form validation errors so the frontend can see what's wrong."""
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors(), "body": getattr(exc, "body", None)},
+    )
 
 class Caesar_Cipher_Request(BaseModel):  # only for request
     text: str
@@ -480,3 +493,37 @@ async def decrypt_api(
         }
     except Exception as e:
         return {"error": str(e)}
+
+
+# AES file encryption
+@app.post("/aes-file-encrypt")
+async def aes_file_encrypt(file: UploadFile = File(...)):
+    file_data = await file.read()
+    if len(file_data) > 100 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File exceeds the 100MB size limit.")
+    try:
+        encrypted_bytes, key_b64 = aes_cipher.encrypt_bytes(file_data)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Encryption failed: {str(e)}")
+    return {
+        "filename": file.filename,
+        "encrypted_key": key_b64,
+        "encrypted_file": base64.b64encode(encrypted_bytes).decode("utf-8"),
+    }
+
+
+@app.post("/aes-file-decrypt")
+async def aes_file_decrypt(
+    encrypted_file: str = Form(...),
+    encrypted_key: str = Form(...),
+    filename: str = Form(...),
+):
+    try:
+        ciphertext = base64.b64decode(encrypted_file)
+        decrypted = aes_cipher.decrypt_bytes(ciphertext, encrypted_key)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Decryption failed: {str(e)}")
+    return {
+        "filename": filename,
+        "decrypted_file": base64.b64encode(decrypted).decode("utf-8"),
+    }

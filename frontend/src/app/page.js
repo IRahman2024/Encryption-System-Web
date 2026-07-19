@@ -161,7 +161,7 @@ export default function Home() {
           const formData = new FormData();
           formData.append('file', file);
 
-          const endpoint = method === 'rsa' ? 'https://encryption-system-web-1.onrender.com/rsa-file-encrypt' : 'https://encryption-system-web-1.onrender.com/aes-file-encrypt';
+          const endpoint = method === 'rsa' ? 'https://encryption-system-web-1.onrender.com/rsa-file-encrypt' : '/api/aes-file-encrypt';
 
           const response = await fetch(endpoint, {
             method: 'POST',
@@ -203,6 +203,18 @@ export default function Home() {
                 blob: zipContent,
                 fileName: baseName + '.zip'
               });
+            } else if (method === 'aes' && data.encrypted_key) {
+              const zip = new JSZip();
+
+              zip.file(baseName + '.enc', encWithHeader);
+              zip.file(baseName + '.key', data.encrypted_key);
+
+              const zipContent = await zip.generateAsync({ type: "blob" });
+
+              setProcessedFile({
+                blob: zipContent,
+                fileName: baseName + '.zip'
+              });
             } else {
               const encBlob = new Blob([encWithHeader], { type: 'application/octet-stream' });
               setProcessedFile({
@@ -222,13 +234,22 @@ export default function Home() {
           }
 
           const keyFileContent = await keyFile.text();
-          let keyData;
-          try {
-            keyData = JSON.parse(keyFileContent);
-          } catch (e) {
-            alert('Invalid key file format. Please upload a valid .key file.');
-            setIsProcessing(false);
-            return;
+          let keyData = null;
+          let aesKeyString = null;
+
+          if (method === 'aes') {
+            // AES .key file is a plain base64 string — wrap it so the JSON-parsing
+            // branch below stays uniform.
+            aesKeyString = keyFileContent.trim();
+            keyData = { encrypted_key: aesKeyString };
+          } else {
+            try {
+              keyData = JSON.parse(keyFileContent);
+            } catch (e) {
+              alert('Invalid key file format. Please upload a valid .key file.');
+              setIsProcessing(false);
+              return;
+            }
           }
 
           const encArrayBuffer = await file.arrayBuffer();
@@ -237,16 +258,27 @@ export default function Home() {
           const originalExt = new TextDecoder().decode(encAllBytes.slice(2, 2 + extLength));
           const rawEncryptedBytes = encAllBytes.slice(2 + extLength);
 
-          const encBlob = new Blob([rawEncryptedBytes], { type: 'application/octet-stream' });
           const formData = new FormData();
-          formData.append('encrypted_file', encBlob, 'encrypted.bin');
 
           if (method === 'rsa') {
+            const encBlob = new Blob([rawEncryptedBytes], { type: 'application/octet-stream' });
+            formData.append('encrypted_file', encBlob, 'encrypted.bin');
             formData.append('encrypted_aes_key', keyData.encrypted_aes_key);
             formData.append('private_key', keyData.private_key);
+          } else if (method === 'aes') {
+            // Backend expects encrypted_file + encrypted_key as base64 strings,
+            // matching the shape of the encrypt response.
+            let binary = '';
+            for (let i = 0; i < rawEncryptedBytes.length; i++) {
+              binary += String.fromCharCode(rawEncryptedBytes[i]);
+            }
+            const encryptedFileB64 = btoa(binary);
+            formData.append('encrypted_file', encryptedFileB64);
+            formData.append('encrypted_key', keyData.encrypted_key);
+            formData.append('filename', file.name.replace(/\.enc$/i, ''));
           }
 
-          const endpoint = method === 'rsa' ? 'https://encryption-system-web-1.onrender.com/rsa-file-decrypt' : 'https://encryption-system-web-1.onrender.com/aes-file-decrypt';
+          const endpoint = method === 'rsa' ? 'https://encryption-system-web-1.onrender.com/rsa-file-decrypt' : '/api/aes-file-decrypt';
 
           try {
             const response = await fetch(endpoint, {
