@@ -33,6 +33,16 @@ class Caesar_Cipher_Request(BaseModel):  # only for request
 class Caesar_Cipher_Response(BaseModel):  # only for response
     text: str
 
+class BruteForce_Candidate(BaseModel):
+    shift: int
+    plaintext: str
+
+class BruteForce_Request(BaseModel):  # only for request
+    text: str
+
+class BruteForce_Response(BaseModel):  # only for response
+    candidates: List[BruteForce_Candidate]
+
 class Text_Key_request(BaseModel):  # only for request
     text: str
     key: str
@@ -306,6 +316,31 @@ def caesar_encrypt(payLoad: Caesar_Cipher_Request):
             else:
                 resultText += char
         return {"text": resultText}
+
+
+def _caesar_decrypt_one(text: str, shift: int) -> str:
+    """Decrypt a Caesar-encrypted string by `shift` positions using the same
+    alphabet-only, case-preserving logic as `caesar_encrypt`."""
+    result = ""
+    for char in text:
+        if char.isalpha():
+            base = ord('A') if char.isupper() else ord('a')
+            result += chr((ord(char) - base - shift) % 26 + base)
+        else:
+            result += char
+    return result
+
+
+@app.post("/caesar/bruteforce", response_model=BruteForce_Response)
+def caesar_bruteforce(payLoad: BruteForce_Request):
+    """Try all 26 Caesar shifts against the ciphertext and return each
+    candidate (shift + resulting plaintext) in a single response."""
+    text = payLoad.text or ""
+    candidates = [
+        BruteForce_Candidate(shift=s, plaintext=_caesar_decrypt_one(text, s))
+        for s in range(26)
+    ]
+    return {"candidates": candidates}
 
 # vigenère-cipher
 @app.post("/vigenere", response_model=Text_Response)
