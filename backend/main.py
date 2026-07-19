@@ -279,7 +279,7 @@ class HillCipher:
 
 @app.get("/")
 def read_root():
-    return {"Hello": "World"}
+    return {"Cipher Server Active"}
 
 
 # caesar-cipher
@@ -305,28 +305,31 @@ def vigenere_encrypt(payLoad: Text_Key_request):
     print('hit local vigenere cipher', payLoad.text)
 
     text = payLoad.text
-    key = payLoad.key  # This should now be a string (e.g., "SECRET")
+    key = payLoad.key.upper()  # Normalize key to uppercase
     mode = payLoad.mode
     resultText = ""
 
-    # Pre-calculate shift values from the keyword string
-    # If your key is a string, we convert each char to its shift value
-    key_shifts = [ord(k) - 32 for k in key]
+    # Traditional Vigenère: each key letter gives a shift of 0-25 (A=0, B=1, ..., Z=25)
+    key_shifts = [ord(k) - ord('A') for k in key if k.isalpha()]
     key_length = len(key_shifts)
 
-    if mode == 'encrypt':
-        for i, char in enumerate(text):
-            # Get the shift from the current position in the key
-            shift = key_shifts[i % key_length]
-            # Apply shift within the 95-character printable range
-            resultText += chr((ord(char) - 32 + shift) % 95 + 32)
-        return {"text": resultText}
+    key_index = 0  # Tracks position in the key (only advances on letters)
 
-    else:  # Decrypt mode
-        for i, char in enumerate(text):
-            shift = key_shifts[i % key_length]
-            # Subtract shift
-            resultText += chr((ord(char) - 32 - shift) % 95 + 32)
+    for char in text:
+        if char.isalpha():
+            shift = key_shifts[key_index % key_length]
+            base = ord('A') if char.isupper() else ord('a')
+
+            if mode == 'encrypt':
+                resultText += chr((ord(char) - base + shift) % 26 + base)
+            else:  # Decrypt mode
+                resultText += chr((ord(char) - base - shift) % 26 + base)
+
+            key_index += 1  # Only advance key for alphabetic characters
+        else:
+            # Non-alphabetic characters pass through unchanged
+            resultText += char
+
     return {"text": resultText}
 
 # playfair-cipher
