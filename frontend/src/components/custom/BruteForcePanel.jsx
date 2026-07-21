@@ -84,16 +84,16 @@ export function BruteForcePanel({ ciphertext = '' }) {
 
     useEffect(() => {
         if (!ciphertext) {
-            setCandidates([])
-            setError('')
-            setIsLoading(false)
-            setHasRun(false)
             return undefined
         }
 
         let cancelled = false
-        setIsLoading(true)
-        setError('')
+        queueMicrotask(() => {
+            if (cancelled) return
+            setIsLoading(true)
+            setError('')
+        })
+
 
         runCaesarBruteForce(ciphertext)
             .then(result => {
