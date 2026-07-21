@@ -34,6 +34,13 @@ export function FilePanel({
     const handleFileChange = (e) => {
         if (e.target.files && e.target.files.length > 0) {
             onFileSelect?.(e.target.files[0])
+            e.target.value = ''
+        }
+    }
+    const handleUploadKeyDown = (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            fileInputRef.current?.click()
         }
     }
     const handleDownload = () => {
@@ -93,15 +100,19 @@ export function FilePanel({
                     ) : (
                         <div
                             className={`flex h-full w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-5 text-center transition-all ${isDragging ? 'scale-[0.98] border-[var(--accent)] bg-[var(--accent-light)]' : 'border-[var(--panel-border)] bg-black/10 hover:border-[var(--accent)]/70 hover:bg-white/[0.04]'}`}
+                            role="button"
+                            tabIndex={0}
+                            aria-label="Choose a file to upload"
                             onDragOver={handleDragOver}
                             onDragLeave={handleDragLeave}
                             onDrop={handleDrop}
                             onClick={() => fileInputRef.current?.click()}
+                            onKeyDown={handleUploadKeyDown}
                         >
                             <UploadCloudIcon size={48} className={`mb-4 transition-colors ${isDragging ? 'text-[var(--accent)]' : 'text-[var(--panel-text-muted)]'}`} />
                             <p className="mb-1 font-semibold text-[var(--panel-text)]">Drop file into the vault</p>
                             <p className="text-sm text-[var(--panel-text-muted)]">or click to browse</p>
-                            <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
+                            <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" tabIndex={-1} />
                         </div>
                     )
                 ) : processedFile ? (
