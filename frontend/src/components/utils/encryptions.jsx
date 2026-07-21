@@ -46,9 +46,9 @@ export const base64Cipher = (text, mode) => {
 }
 
 export const vigenereCipher = (
-    tex,
+    text,
     key,
-    mod,
+    mode,
 ) => {
     if (!key) return text
     const cleanKey = key.replace(/[^a-zA-Z]/g, '').toUpperCase()
