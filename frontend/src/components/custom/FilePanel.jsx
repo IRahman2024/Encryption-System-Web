@@ -15,6 +15,7 @@ export function FilePanel({
     onFileSelect,
     onClear,
     isProcessing,
+    progress,
 }) {
     const [isDragging, setIsDragging] = useState(false)
     const fileInputRef = useRef(null)
@@ -137,9 +138,31 @@ export function FilePanel({
                 ) : (
                     <div className="flex flex-col items-center justify-center text-center opacity-70">
                         <FileIcon size={48} className="mb-4 text-[var(--panel-text-muted)]" />
-                        <p className="font-medium text-[var(--panel-text-muted)]">
-                            {isProcessing ? 'Processing secure payload...' : 'Awaiting file output...'}
-                        </p>
+                        {isProcessing ? (
+                            <div className="flex flex-col items-center space-y-3">
+                                <p className="font-medium text-[var(--panel-text-muted)]">
+                                    Processing secure payload...
+                                </p>
+                                {progress !== null && progress !== undefined && (
+                                    <div className="w-48">
+                                        <div className="flex justify-between text-xs text-[var(--panel-text-muted)] mb-1">
+                                            <span>Progress</span>
+                                            <span>{progress}%</span>
+                                        </div>
+                                        <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
+                                            <div
+                                                className="h-full rounded-full bg-[var(--accent)] transition-all duration-300 ease-out"
+                                                style={{ width: `${progress}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <p className="font-medium text-[var(--panel-text-muted)]">
+                                Awaiting file output...
+                            </p>
+                        )}
                     </div>
                 )}
             </div>

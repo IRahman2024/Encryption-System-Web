@@ -10,6 +10,7 @@ import { FilePanel } from "@/components/custom/FilePanel";
 import { CipherVisualizer } from "@/components/custom/CipherVisualizer";
 import { BruteForcePanel } from "@/components/custom/BruteForcePanel";
 import { processText } from "@/components/utils/classicalCiphers.mjs";
+import { encryptFileRSA, decryptFileRSA, encryptFileAES, decryptFileAES } from "@/components/utils/fileCrypto.mjs";
 import JSZip from "jszip";
 
 const BIT_SEEDS = [
@@ -51,6 +52,7 @@ export default function Home() {
   const [isProcessing, setIsProcessing] = useState(false)
   const [ambientMotion, setAmbientMotion] = useState(true)
   const [bruteForce, setBruteForce] = useState(false)
+  const [progress, setProgress] = useState(null)
 
   const handleMethodChange = (newMethod) => {
     setMethod(newMethod)
@@ -78,165 +80,129 @@ export default function Home() {
     }
 
     setIsProcessing(true);
+    setProgress(0);
 
     try {
       if (['rsa', 'aes'].includes(method)) {
         if (mode === 'encrypt') {
-          const formData = new FormData();
-          formData.append('file', file);
+          // Read file as ArrayBuffer
+          const fileArrayBuffer = await file.arrayBuffer();
 
-          const endpoint = method === 'rsa' ? 'https://encryption-system-web-1.onrender.com/rsa-file-encrypt' : '/api/aes-file-encrypt';
+          // Extract filename info
+          const extIndex = file.name.lastIndexOf('.');
+          const originalExt = extIndex !== -1 ? file.name.substring(extIndex) : '';
+          const baseName = extIndex !== -1 ? file.name.substring(0, extIndex) : file.name;
 
-          const response = await fetch(endpoint, {
-            method: 'POST',
-            body: formData,
-          });
+          let encryptedData;
 
-          if (!response.ok) throw new Error('Encryption failed');
-          const data = await response.json();
-
-          if (data.encrypted_file) {
-            const encFileBytes = Uint8Array.from(atob(data.encrypted_file), c => c.charCodeAt(0));
-
-            const extIndex = data.filename.lastIndexOf('.');
-            const originalExt = extIndex !== -1 ? data.filename.substring(extIndex) : '';
-            const baseName = extIndex !== -1 ? data.filename.substring(0, extIndex) : data.filename;
-
-            const extBytes = new TextEncoder().encode(originalExt);
-            const header = new Uint8Array(2);
-            new DataView(header.buffer).setUint16(0, extBytes.length, true);
-            const encWithHeader = new Uint8Array(header.length + extBytes.length + encFileBytes.length);
-            encWithHeader.set(header, 0);
-            encWithHeader.set(extBytes, 2);
-            encWithHeader.set(encFileBytes, 2 + extBytes.length);
-
-            if (method === 'rsa' && data.private_key && data.encrypted_aes_key) {
-              const zip = new JSZip();
-
-              zip.file(baseName + '.enc', encWithHeader);
-
-              const keyData = {
-                private_key: data.private_key,
-                encrypted_aes_key: data.encrypted_aes_key
-              };
-              zip.file(baseName + '.key', JSON.stringify(keyData, null, 2));
-
-              const zipContent = await zip.generateAsync({ type: "blob" });
-
-              setProcessedFile({
-                blob: zipContent,
-                fileName: baseName + '.zip'
-              });
-            } else if (method === 'aes' && data.encrypted_key) {
-              const zip = new JSZip();
-
-              zip.file(baseName + '.enc', encWithHeader);
-              zip.file(baseName + '.key', data.encrypted_key);
-
-              const zipContent = await zip.generateAsync({ type: "blob" });
-
-              setProcessedFile({
-                blob: zipContent,
-                fileName: baseName + '.zip'
-              });
-            } else {
-              const encBlob = new Blob([encWithHeader], { type: 'application/octet-stream' });
-              setProcessedFile({
-                blob: encBlob,
-                fileName: baseName + '.enc'
-              });
-            }
+          if (method === 'rsa') {
+            // Client-side RSA encryption (hybrid: RSA-OAEP + AES-256-GCM)
+            encryptedData = await encryptFileRSA(fileArrayBuffer, (p) => setProgress(p));
           } else {
-            alert("Processed successfully, but no file returned.");
+            // Client-side AES encryption (AES-256-GCM)
+            encryptedData = await encryptFileAES(fileArrayBuffer, (p) => setProgress(p));
           }
+
+          // Create binary header: extension length + extension
+          const extBytes = new TextEncoder().encode(originalExt);
+          const header = new Uint8Array(2);
+          new DataView(header.buffer).setUint16(0, extBytes.length, true);
+
+          // Combine header + encrypted content
+          const encWithHeader = new Uint8Array(header.length + extBytes.length + encryptedData.encryptedContent.length);
+          encWithHeader.set(header, 0);
+          encWithHeader.set(extBytes, 2);
+          encWithHeader.set(encryptedData.encryptedContent, 2 + extBytes.length);
+
+          // Create zip file with .enc and .key
+          const zip = new JSZip();
+          zip.file(baseName + '.enc', encWithHeader);
+
+          if (method === 'rsa') {
+            const keyData = {
+              private_key: encryptedData.privateKeyPem,
+              encrypted_aes_key: encryptedData.encryptedAesKeyBase64
+            };
+            zip.file(baseName + '.key', JSON.stringify(keyData, null, 2));
+          } else {
+            zip.file(baseName + '.key', encryptedData.keyBase64);
+          }
+
+          const zipContent = await zip.generateAsync({ type: "blob" });
+          setProcessedFile({
+            blob: zipContent,
+            fileName: baseName + '.zip'
+          });
 
         } else if (mode === 'decrypt') {
           if (!keyFile) {
             alert('Please upload the key file needed for decryption.');
             setIsProcessing(false);
+            setProgress(null);
             return;
           }
 
+          // Read key file
           const keyFileContent = await keyFile.text();
-          let keyData = null;
-          let aesKeyString = null;
+          let keyData;
 
           if (method === 'aes') {
-            // AES .key file is a plain base64 string — wrap it so the JSON-parsing
-            // branch below stays uniform.
-            aesKeyString = keyFileContent.trim();
-            keyData = { encrypted_key: aesKeyString };
+            // AES .key file is a plain base64 string
+            keyData = { encrypted_key: keyFileContent.trim() };
           } else {
+            // RSA .key file is JSON
             try {
               keyData = JSON.parse(keyFileContent);
             } catch (e) {
               alert('Invalid key file format. Please upload a valid .key file.');
               setIsProcessing(false);
+              setProgress(null);
               return;
             }
           }
 
+          // Read encrypted file and strip header
           const encArrayBuffer = await file.arrayBuffer();
           const encAllBytes = new Uint8Array(encArrayBuffer);
           const extLength = new DataView(encArrayBuffer).getUint16(0, true);
           const originalExt = new TextDecoder().decode(encAllBytes.slice(2, 2 + extLength));
           const rawEncryptedBytes = encAllBytes.slice(2 + extLength);
 
-          const formData = new FormData();
+          let decryptedBytes;
 
           if (method === 'rsa') {
-            const encBlob = new Blob([rawEncryptedBytes], { type: 'application/octet-stream' });
-            formData.append('encrypted_file', encBlob, 'encrypted.bin');
-            formData.append('encrypted_aes_key', keyData.encrypted_aes_key);
-            formData.append('private_key', keyData.private_key);
-          } else if (method === 'aes') {
-            // Backend expects encrypted_file + encrypted_key as base64 strings,
-            // matching the shape of the encrypt response.
-            let binary = '';
-            for (let i = 0; i < rawEncryptedBytes.length; i++) {
-              binary += String.fromCharCode(rawEncryptedBytes[i]);
-            }
-            const encryptedFileB64 = btoa(binary);
-            formData.append('encrypted_file', encryptedFileB64);
-            formData.append('encrypted_key', keyData.encrypted_key);
-            formData.append('filename', file.name.replace(/\.enc$/i, ''));
+            // Client-side RSA decryption
+            decryptedBytes = await decryptFileRSA(
+              rawEncryptedBytes.buffer,
+              keyData.encrypted_aes_key,
+              keyData.private_key,
+              (p) => setProgress(p)
+            );
+          } else {
+            // Client-side AES decryption
+            decryptedBytes = await decryptFileAES(
+              rawEncryptedBytes.buffer,
+              keyData.encrypted_key,
+              (p) => setProgress(p)
+            );
           }
 
-          const endpoint = method === 'rsa' ? 'https://encryption-system-web-1.onrender.com/rsa-file-decrypt' : '/api/aes-file-decrypt';
-
-          try {
-            const response = await fetch(endpoint, {
-              method: 'POST',
-              body: formData,
-            });
-            if (!response.ok) throw new Error('Decryption failed');
-            const data = await response.json();
-
-            if (data.decrypted_file) {
-              const decFileBytes = Uint8Array.from(atob(data.decrypted_file), c => c.charCodeAt(0));
-              const decBlob = new Blob([decFileBytes], { type: 'application/octet-stream' });
-
-              const encBaseName = file.name.replace('.enc', '') || 'decrypted_file';
-              setProcessedFile({
-                blob: decBlob,
-                fileName: encBaseName + originalExt
-              });
-            } else {
-              alert("Decrypted successfully, but no file returned.");
-            }
-          } catch (err) {
-            console.error(err);
-            alert("Error decrypting file.");
-          }
-          setIsProcessing(false);
+          // Create decrypted file blob
+          const decBlob = new Blob([decryptedBytes], { type: 'application/octet-stream' });
+          const encBaseName = file.name.replace('.enc', '') || 'decrypted_file';
+          setProcessedFile({
+            blob: decBlob,
+            fileName: encBaseName + originalExt
+          });
         }
       }
     } catch (e) {
       console.error("File processing error:", e);
-      alert("An error occurred during file processing.");
+      alert("An error occurred during file processing: " + e.message);
     }
 
     setIsProcessing(false);
+    setProgress(null);
   }
 
   const itemVariants = {
@@ -447,6 +413,7 @@ export default function Home() {
                   label={mode === 'encrypt' ? 'Encrypted File' : 'Decrypted File'}
                   processedFile={processedFile}
                   isProcessing={isProcessing}
+                  progress={progress}
                 />
               </div>
             </>
