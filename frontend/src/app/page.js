@@ -3,38 +3,14 @@ import { MethodSelector } from "@/components/custom/MethodSelector";
 import { ModeToggle } from "@/components/custom/ModeToggle";
 import { TextPanel } from "@/components/custom/TextPanel";
 import { TypeToggle } from "@/components/custom/TypeToggle";
-import { useState, useEffect, useCallback } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRightLeftIcon, BinaryIcon, KeyRoundIcon, PlayIcon, ShieldCheckIcon, SparklesIcon } from "lucide-react";
 import { FilePanel } from "@/components/custom/FilePanel";
 import { CipherVisualizer } from "@/components/custom/CipherVisualizer";
 import { BruteForcePanel } from "@/components/custom/BruteForcePanel";
+import { processText } from "@/components/utils/classicalCiphers.mjs";
 import JSZip from "jszip";
-
-const CIPHER_CONFIG = {
-  caesar: {
-    endpoint: "/api/caesar",
-    prepareKey: (key) => parseInt(key, 10) || 3,
-  },
-  vigenere: {
-    endpoint: "/api/vigenere",
-    prepareKey: (key) => key,
-  },
-  hill: {
-    endpoint: "/api/hillfair-cipher",
-    prepareKey: (key) => {
-      try {
-        return JSON.parse(key);
-      } catch {
-        return [[0, 0], [0, 0]];
-      }
-    },
-  },
-  playfair: {
-    endpoint: "/api/playfair-cipher",
-    prepareKey: (key) => key.trim(),
-  }
-};
 
 const BIT_SEEDS = [
   '0100110011010010110100101101',
@@ -73,7 +49,6 @@ export default function Home() {
   const [keyFile, setKeyFile] = useState(null)
   const [processedFile, setProcessedFile] = useState(null)
   const [isProcessing, setIsProcessing] = useState(false)
-  const [outputText, setOutputText] = useState('')
   const [ambientMotion, setAmbientMotion] = useState(true)
   const [bruteForce, setBruteForce] = useState(false)
 
@@ -87,61 +62,10 @@ export default function Home() {
 
   const isKeyMissing = ['vigenere', 'playfair', 'hill', 'caesar'].includes(method) && (!key || key.trim() === '');
 
-  const handleCipherAction = useCallback(async () => {
-    if (!inputText || isKeyMissing) {
-      setOutputText('');
-      return;
-    }
-
-    const config = CIPHER_CONFIG[method];
-    if (!config) return;
-
-    try {
-      const payload = {
-        text: inputText,
-        mode: mode
-      };
-
-      if (config.prepareKey) {
-        const preparedKey = config.prepareKey(key);
-        if (method === 'caesar') {
-          payload.shift = preparedKey;
-        } else {
-          payload.key = preparedKey;
-        }
-      }
-
-      const response = await fetch(config.endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-
-      let result = data.text;
-      if (!result && data.message) {
-        result = data.message.replace(/^(encrypt: |decrypt: )/, '');
-      }
-
-      setOutputText(result || '');
-    } catch (error) {
-      console.error("Cipher Error:", error);
-      setOutputText("Error processing text. Check key format.");
-    }
-  }, [inputText, key, method, mode, isKeyMissing]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      handleCipherAction();
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [handleCipherAction]);
+  const outputText = useMemo(() => {
+    if (inputType !== 'text' || !inputText || isKeyMissing) return ''
+    return processText(inputText, method, key, mode)
+  }, [inputText, inputType, isKeyMissing, key, method, mode])
 
   const MAX_FILE_SIZE = 100 * 1024 * 1024;
 

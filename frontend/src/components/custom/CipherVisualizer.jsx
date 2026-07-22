@@ -10,6 +10,7 @@ import {
     Orbit,
     Route,
 } from 'lucide-react'
+import { buildCaesarVisualizationSteps, buildVigenereVisualizationSteps } from '@/components/utils/classicalVisualization.mjs'
 
 const PRINTABLE_START = 32
 const PRINTABLE_COUNT = 95
@@ -118,7 +119,7 @@ function positionOf(matrix, char) {
     return null
 }
 
-function buildCaesarSteps(text, rawKey, mode) {
+export function buildCaesarSteps(text, rawKey, mode) {
     const shift = Number.parseInt(rawKey, 10) || 3
     const signedShift = mode === 'encrypt' ? shift : -shift
     return [...text].map((input, index) => {
@@ -136,7 +137,7 @@ function buildCaesarSteps(text, rawKey, mode) {
     })
 }
 
-function buildVigenereSteps(text, key, mode) {
+export function buildVigenereSteps(text, key, mode) {
     if (!key) return []
     const keyCharacters = [...key]
     return [...text].map((input, index) => {
@@ -250,8 +251,8 @@ function buildHillSteps(text, rawKey, mode) {
 
 function buildVisualization(method, text, key, mode) {
     if (!text) return { steps: [], error: '' }
-    if (method === 'caesar') return { steps: buildCaesarSteps(text, key, mode), error: '' }
-    if (method === 'vigenere') return { steps: buildVigenereSteps(text, key, mode), error: key ? '' : 'Enter a Vigenere key to begin.' }
+    if (method === 'caesar') return { steps: buildCaesarVisualizationSteps(text, key, mode), error: '' }
+    if (method === 'vigenere') return { steps: buildVigenereVisualizationSteps(text, key, mode), error: key ? '' : 'Enter a Vigenere key to begin.' }
     if (method === 'playfair') return { steps: buildPlayfairSteps(text, key, mode), error: key ? '' : 'Enter a Playfair key to build the matrix.' }
     if (method === 'hill') return buildHillSteps(text, key, mode)
     return { steps: [], error: '' }
@@ -502,7 +503,7 @@ export function CipherVisualizer({ method, text, output, keyValue, mode }) {
                 {!text && (
                     <div className="py-9 text-center">
                         <p className="font-mono text-sm text-[var(--text-main)]">Enter text to generate the trace.</p>
-                        <p className="mt-2 text-xs text-[var(--text-muted)]">The final result still comes from the existing cipher endpoint.</p>
+                        <p className="mt-2 text-xs text-[var(--text-muted)]">The final result and trace use the same local cipher rules.</p>
                     </div>
                 )}
 
@@ -525,7 +526,7 @@ export function CipherVisualizer({ method, text, output, keyValue, mode }) {
                         {method === 'hill' && <HillDiagram step={currentStep} />}
 
                         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--panel-border)] pt-4 text-xs">
-                            <span className="text-[var(--text-muted)]">Server output remains authoritative</span>
+                            <span className="text-[var(--text-muted)]">Local cipher output</span>
                             <code className="max-w-full break-all text-[var(--accent-2)]">{output || 'processing…'}</code>
                         </div>
                     </div>

@@ -10,7 +10,7 @@ import {
     RotateCcw,
 } from 'lucide-react'
 import { Quantum } from 'ldrs/react'
-import { runCaesarBruteForce } from '@/components/utils/encryptions'
+import { buildCaesarBruteForceCandidates } from '@/components/utils/classicalCiphers.mjs'
 
 const ROW_HEIGHT_PX = 56 // fixed row height so 5 rows fit exactly in the scroll area
 
@@ -22,7 +22,7 @@ function LoadingState() {
                 Brute-forcing 26 shifts…
             </p>
             <p className="text-xs text-[var(--text-muted)]">
-                Asking the server for every possible key.
+                Calculating every possible key locally.
             </p>
         </div>
     )
@@ -95,7 +95,7 @@ export function BruteForcePanel({ ciphertext = '' }) {
         })
 
 
-        runCaesarBruteForce(ciphertext)
+        Promise.resolve(buildCaesarBruteForceCandidates(ciphertext))
             .then(result => {
                 if (cancelled) return
                 setCandidates(result)
@@ -168,7 +168,7 @@ export function BruteForcePanel({ ciphertext = '' }) {
                         <div className="flex items-center justify-between rounded-md border border-[var(--panel-border)] bg-black/20 px-3 py-2 text-xs">
                             <span className="flex items-center gap-2 text-[var(--text-muted)]">
                                 <ArrowDownToLine className="h-4 w-4 text-[var(--accent-2)]" />
-                                Server returned every candidate at once — scroll to inspect.
+                                Generated locally with no network delay — scroll to inspect.
                             </span>
                             <span className="font-mono text-[var(--text-muted)]">
                                 5 visible
